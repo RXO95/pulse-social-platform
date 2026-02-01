@@ -11,6 +11,9 @@ venv/
 .venv/
 
 # ML
+# ML models
+ml-service/models/ner_model/*
+
 *.pt
 *.bin
 *.safetensors
