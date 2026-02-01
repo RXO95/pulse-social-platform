@@ -1,4 +1,23 @@
-.env
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Environments
+.env
+.env.*
 venv/
+.venv/
+
+# ML
+*.pt
+*.bin
+*.safetensors
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

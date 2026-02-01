@@ -4,7 +4,7 @@ from jose import jwt
 from app.config import JWT_SECRET
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 30
 
 
 def create_access_token(data: dict):

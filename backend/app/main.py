@@ -3,6 +3,10 @@ from app.routes.auth import router as auth_router
 from app.routes.posts import router as posts_router
 from app.routes.feed import router as feed_router
 from app.routes.likes import router as likes_router
+from app.routes.users import router as users_router
+from app.routes.follow import router as follow_router
+from app.routes.personal_feed import router as personal_feed_router
+from app.routes.trending import router as trending_router
 
 
 app = FastAPI(title="Pulse Backend API")
@@ -11,7 +15,10 @@ app.include_router(auth_router)
 app.include_router(posts_router)
 app.include_router(feed_router)
 app.include_router(likes_router)
-
+app.include_router(users_router)
+app.include_router(follow_router)
+app.include_router(personal_feed_router)
+app.include_router(trending_router)
 
 @app.get("/")
 def root():
