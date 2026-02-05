@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Pulse Feed</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body onload="requireAuth(); fetchPosts();">
+
+  <h2>Pulse</h2>
+  <button onclick="logout()">Logout</button>
+
+  <hr>
+
+  <textarea id="content" rows="3" cols="50" placeholder="What's happening?"></textarea><br>
+  <button onclick="createPost(content.value)">Post</button>
+
+  <hr>
+
+  <div id="feed"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

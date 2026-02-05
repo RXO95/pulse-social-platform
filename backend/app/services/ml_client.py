@@ -1,5 +1,5 @@
-import requests
 import os
+import httpx
 
 ML_URL = os.getenv("ML_SERVICE_URL")
 
@@ -9,30 +9,47 @@ VIOLENT_KEYWORDS = [
     "hang", "stab"
 ]
 
+SENSITIVE_LABELS = {"PER", "ORG", "GPE", "LOC"}
 
-def analyze_text(text: str):
+
+async def analyze_text(text: str):
+    # Safety fallback
+    ner_result = {"entities": []}
+
+    if not ML_URL:
+        return {
+            "entities": [],
+            "risk_score": 0.0,
+            "violent_detected": False,
+            "contains_sensitive_entity": False
+        }
+
+    # 🔌 Call ML service
     try:
-        response = requests.post(
-            ML_URL,
-            json={"text": text},
-            timeout=3
-        )
-        ner_result = response.json()
+        async with httpx.AsyncClient(timeout=3) as client:
+            response = await client.post(
+                ML_URL,
+                json={"text": text}
+            )
+            response.raise_for_status()
+            ner_result = response.json()
 
     except Exception:
+        # ML service failure → do not crash backend
         ner_result = {"entities": []}
 
     entities = ner_result.get("entities", [])
 
+    # 🔪 Detect violence
     text_lower = text.lower()
     violent = any(word in text_lower for word in VIOLENT_KEYWORDS)
 
-    sensitive_labels = {"PERSON", "ORG", "GPE", "LOC"}
+    # 🧠 Detect sensitive entities
     contains_sensitive = any(
-        ent["label"] in sensitive_labels for ent in entities
+        ent.get("label") in SENSITIVE_LABELS for ent in entities
     )
 
-    # 🔥 Risk logic
+    # 🔥 Risk logic (boosted correctly)
     risk_score = 0.0
 
     if violent and contains_sensitive:

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
 
 from app.models.post import PostCreate
@@ -15,22 +15,31 @@ async def create_post(
     user=Depends(get_current_user)
 ):
     # 🔍 Analyze content using ML service
-    analysis = analyze_text(post.content)
+    try:
+        analysis = await analyze_text(post.content)
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail="ML service unavailable"
+        )
 
     # ❌ Block high-risk content
-    if analysis["risk_score"] > 0.6:
-        return {
-            "message": "Post blocked due to sensitive or harmful content",
-            "analysis": analysis
-        }
+    if analysis.get("risk_score", 0) > 0.6:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "message": "Post blocked due to sensitive or harmful content",
+                "analysis": analysis
+            }
+        )
 
     # ✅ Allowed post
     new_post = {
         "user_id": user["user_id"],
         "username": user["username"],
         "content": post.content,
-        "entities": analysis["entities"],
-        "risk_score": analysis["risk_score"],
+        "entities": analysis.get("entities", []),
+        "risk_score": analysis.get("risk_score", 0),
         "likes": 0,
         "created_at": datetime.utcnow()
     }
@@ -41,3 +50,13 @@ async def create_post(
         "message": "Post created successfully",
         "analysis": analysis
     }
+
+
+@router.get("/")
+async def get_posts():
+    posts = []
+    async for post in db.posts.find().sort("created_at", -1):
+        post["_id"] = str(post["_id"])
+        posts.append(post)
+
+    return posts
