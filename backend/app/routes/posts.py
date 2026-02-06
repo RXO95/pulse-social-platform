@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
+from bson import ObjectId
 
 from app.models.post import PostCreate
 from app.services.database import db
@@ -40,6 +41,8 @@ async def create_post(
         "content": post.content,
         "entities": analysis.get("entities", []),
         "risk_score": analysis.get("risk_score", 0),
+        # --- SAVE THE CONTEXT DATA ---
+        "context_data": analysis.get("context_data", {}), 
         "likes": 0,
         "created_at": datetime.utcnow()
     }
@@ -60,3 +63,21 @@ async def get_posts():
         posts.append(post)
 
     return posts
+
+
+@router.get("/{post_id}")
+async def get_post_by_id(post_id: str):
+    # 1. Validate the ID format
+    if not ObjectId.is_valid(post_id):
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+
+    # 2. Fetch from Database
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    
+    # 3. Handle Not Found
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    # 4. Convert ObjectId to string
+    post["_id"] = str(post["_id"])
+    return post

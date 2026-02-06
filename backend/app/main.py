@@ -9,6 +9,7 @@ from app.routes.follow import router as follow_router
 from app.routes.personal_feed import router as personal_feed_router
 from app.routes.trending import router as trending_router
 from app.routes.search import router as search_router
+from app.routes.comments import router as comments_router
 
 app = FastAPI(title="Pulse Backend API")
 
@@ -30,6 +31,7 @@ app.include_router(follow_router)
 app.include_router(personal_feed_router)
 app.include_router(trending_router)
 app.include_router(search_router)
+app.include_router(comments_router)
 
 @app.get("/")
 def root():

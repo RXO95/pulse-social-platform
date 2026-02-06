@@ -1,16 +1,34 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom"; // Import useNavigate
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import LikeButton from "../components/LikeButton";
 
 export default function Feed() {
   const [posts, setPosts] = useState([]);
-  const [trending, setTrending] = useState([]); // Added state for trending
+  const [trending, setTrending] = useState([]);
   const [content, setContent] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentUser, setCurrentUser] = useState(null); // Store current user info
 
   const { logout } = useAuth();
+  const navigate = useNavigate(); // Initialize navigation
   const token = localStorage.getItem("token");
+
+  // --- FETCH CURRENT USER (For Profile Link) ---
+  const fetchCurrentUser = async () => {
+    try {
+      const res = await fetch(`${API}/users/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentUser(data);
+      }
+    } catch {
+      console.error("Failed to load user profile");
+    }
+  };
 
   const fetchPosts = async () => {
     try {
@@ -25,7 +43,6 @@ export default function Feed() {
     }
   };
 
-  // --- FETCH TRENDING DATA ---
   const fetchTrending = async () => {
     try {
       const res = await fetch(`${API}/trending`, {
@@ -73,9 +90,29 @@ export default function Feed() {
     }
   };
 
+  const handleFollowToggle = async (postAuthorId, isFollowing) => {
+    try {
+      const method = isFollowing ? "DELETE" : "POST";
+      const res = await fetch(`${API}/follow/${postAuthorId}`, {
+        method: method,
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        fetchPosts(); 
+      } else {
+        const data = await res.json();
+        alert(data.message || "Action failed");
+      }
+    } catch {
+      alert("Network error while updating follow status");
+    }
+  };
+
   useEffect(() => {
     fetchPosts();
-    fetchTrending(); // Initial trending load
+    fetchTrending();
+    fetchCurrentUser(); // Fetch user on load
   }, []);
 
   const createPost = async () => {
@@ -96,7 +133,7 @@ export default function Feed() {
       }
       setContent("");
       fetchPosts();
-      fetchTrending(); // Update trending when a new post is made
+      fetchTrending();
     } catch {
       alert("Could not create post");
     }
@@ -119,7 +156,15 @@ export default function Feed() {
             style={styles.searchInput}
           />
 
-          <button onClick={logout} style={styles.logoutBtn}>Logout</button>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button 
+              onClick={() => currentUser && navigate(`/profile/${currentUser.username}`)}
+              style={styles.profileBtn}
+            >
+              Profile
+            </button>
+            <button onClick={logout} style={styles.logoutBtn}>Logout</button>
+          </div>
         </div>
       </header>
 
@@ -142,21 +187,46 @@ export default function Feed() {
               <div key={p._id} style={styles.postCard}>
                 <div style={styles.postHeader}>
                   <div style={styles.avatar}>{p.username?.charAt(0).toUpperCase()}</div>
-                  <strong style={styles.username}>@{p.username}</strong>
+                  <div style={styles.userMeta}>
+                    <strong 
+                      style={{...styles.username, cursor: "pointer"}}
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/profile/${p.username}`);
+                      }}
+                    >
+                      @{p.username}
+                    </strong>
+                    <button 
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          handleFollowToggle(p.user_id, p.is_followed_by_user);
+                      }}
+                      style={p.is_followed_by_user ? styles.unfollowBtn : styles.followBtn}
+                    >
+                      {p.is_followed_by_user ? "Following" : "Follow"}
+                    </button>
+                  </div>
                 </div>
 
-                <p style={styles.postContent}>{p.content}</p>
+                {/* --- CLICKABLE POST AREA TO NAVIGATE TO POST DETAIL --- */}
+                <div 
+                  style={{cursor: "pointer"}} 
+                  onClick={() => navigate(`/post/${p._id}`)}
+                >
+                    <p style={styles.postContent}>{p.content}</p>
 
-                {p.risk_score > 0.6 && (
-                  <div style={styles.riskBadge}>⚠ High Risk Content</div>
-                )}
+                    {p.risk_score > 0.6 && (
+                    <div style={styles.riskBadge}>⚠ High Risk Content</div>
+                    )}
 
-                <div style={styles.entityContainer}>
-                  {p.entities?.map((e, idx) => (
-                    <span key={idx} style={styles.tag}>
-                      {e.text} <small style={styles.tagLabel}>{e.label}</small>
-                    </span>
-                  ))}
+                    <div style={styles.entityContainer}>
+                    {p.entities?.map((e, idx) => (
+                        <span key={idx} style={styles.tag}>
+                        {e.text} <small style={styles.tagLabel}>{e.label}</small>
+                        </span>
+                    ))}
+                    </div>
                 </div>
 
                 <div style={styles.actionSection}>
@@ -165,13 +235,19 @@ export default function Feed() {
                     count={p.likes || 0}
                     onLike={() => handleLike(p._id)}
                   />
+                  {/* Optional: Add a small comment icon/text to hint at notes */}
+                  <span 
+                    style={{marginLeft: "15px", fontSize: "14px", color: "#666", cursor: "pointer"}}
+                    onClick={() => navigate(`/post/${p._id}`)}
+                  >
+                    💬 Notes
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         </main>
 
-        {/* --- TRENDING SIDEBAR --- */}
         <aside style={styles.sidebar}>
           <div style={styles.trendingCard}>
             <h3 style={styles.trendingTitle}>What's Happening</h3>
@@ -213,7 +289,7 @@ const styles = {
   },
   headerContent: {
     width: "100%",
-    maxWidth: "1100px", // Expanded for sidebar
+    maxWidth: "1100px",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
@@ -252,7 +328,28 @@ const styles = {
     fontSize: "14px"
   },
   title: { fontSize: "22px", fontWeight: "800", margin: 0, color: "#764ba2" },
-  logoutBtn: { background: "none", border: "1px solid #ddd", borderRadius: "20px", padding: "5px 15px", cursor: "pointer" },
+  
+  // --- BUTTON STYLES ---
+  logoutBtn: { 
+    background: "none", 
+    border: "1px solid #ddd", 
+    borderRadius: "20px", 
+    padding: "5px 15px", 
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500"
+  },
+  profileBtn: {
+    backgroundColor: "#1a1a1a",
+    color: "white",
+    border: "none",
+    borderRadius: "20px",
+    padding: "5px 15px",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "600"
+  },
+  
   mainContent: {
     flex: 1,
     overflowY: "auto",
@@ -287,6 +384,7 @@ const styles = {
   feedList: { display: "flex", flexDirection: "column", gap: "12px", paddingBottom: "100px" },
   postCard: { backgroundColor: "#fff", borderRadius: "12px", padding: "16px", border: "1px solid #eff3f4" },
   postHeader: { display: "flex", alignItems: "center", marginBottom: "8px" },
+  userMeta: { display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1 },
   avatar: { width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "#ffd700", display: "flex", alignItems: "center", justifyContent: "center", marginRight: "12px", fontWeight: "bold" },
   username: { fontSize: "15px" },
   postContent: { fontSize: "16px", margin: "5px 0" },
@@ -299,4 +397,26 @@ const styles = {
     paddingTop: "5px",
     borderTop: "1px solid #f0f2f5"
   },
+  followBtn: {
+    backgroundColor: "#1a1a1a",
+    color: "#fff",
+    border: "none",
+    borderRadius: "20px",
+    padding: "6px 16px",
+    fontSize: "14px",
+    fontWeight: "700",
+    cursor: "pointer",
+    transition: "background 0.2s"
+  },
+  unfollowBtn: {
+    backgroundColor: "transparent",
+    color: "#1a1a1a",
+    border: "1px solid #ddd",
+    borderRadius: "20px",
+    padding: "6px 16px",
+    fontSize: "14px",
+    fontWeight: "700",
+    cursor: "pointer",
+    transition: "all 0.2s"
+  }
 };

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pulse Multilingual NER Architecture</title>
+
+<style>
+:root {
+    --bg-layer-1: #E3F2FD;
+    --bg-layer-2: #FFF3E0;
+    --bg-layer-3: #E8F5E9;
+    --bg-layer-4: #ECEFF1;
+    --box-border: #90A4AE;
+    --text-color: #37474F;
+    --arrow-color: #546E7A;
+}
+
+body {
+    font-family: 'Segoe UI', sans-serif;
+    background:#f4f4f4;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:100vh;
+    margin:0;
+    padding:20px;
+}
+
+.arch-container {
+    background:#fff;
+    width:900px;
+    padding:30px;
+    border-radius:12px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.1);
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+
+.layer-banner {
+    border-radius:8px;
+    padding:15px 20px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    width:100%;
+}
+
+.layer-header {
+    font-weight:700;
+    margin-bottom:15px;
+    text-transform:uppercase;
+    font-size:14px;
+    letter-spacing:1px;
+    color:var(--text-color);
+}
+
+.box-container-row {
+    display:flex;
+    justify-content:center;
+    gap:20px;
+    width:100%;
+}
+
+.box {
+    background:#fff;
+    border:2px solid var(--box-border);
+    border-radius:8px;
+    padding:15px;
+    text-align:center;
+    font-size:14px;
+    font-weight:600;
+    color:var(--text-color);
+    box-shadow:0 2px 5px rgba(0,0,0,0.05);
+    flex:1;
+    max-width:300px;
+}
+
+.box small {
+    display:block;
+    font-weight:400;
+    font-size:12px;
+    margin-top:5px;
+    color:#78909C;
+    line-height:1.4;
+}
+
+/* CONNECTORS */
+
+.connector-row,
+.connector-row-split {
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    position:relative;
+}
+
+.connector-row { height:60px; }
+
+.connector-row-split {
+    height:80px;
+    justify-content:space-around;
+    width:100%;
+}
+
+.connector-group {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    position:relative;
+    width:45%;
+}
+
+.arrow-vertical {
+    font-size:30px;
+    color:var(--arrow-color);
+    font-weight:bold;
+}
+
+.flow-label-vertical {
+    font-size:12px;
+    background:#fff;
+    padding:4px 8px;
+    border-radius:4px;
+    border:1px solid var(--box-border);
+    color:var(--arrow-color);
+    font-weight:700;
+    white-space:nowrap;
+    position:absolute;
+    top:50%;
+    transform:translateY(-50%);
+}
+
+.label-right { left:55%; }
+.label-split-left { right:55%; }
+.label-split-right { left:55%; }
+
+</style>
+</head>
+
+<body>
+
+<div class="arch-container">
+
+<!-- CLIENT -->
+<div class="layer-banner" style="background:var(--bg-layer-1);">
+    <div class="layer-header">1. Client Layer (React UI)</div>
+
+    <div class="box-container-row">
+        <div class="box">
+            Post Creation & Feed View
+            <small>Standard interaction</small>
+        </div>
+
+        <div class="box" style="background:#E1F5FE;border-color:#0288d1;">
+            Post Detail Page
+            <small>Displays NER results on "Trending Page"</small>
+        </div>
+
+        <div class="box">
+            Entity-Aware Search
+            <small>Find posts by entities</small>
+        </div>
+    </div>
+</div>
+
+<!-- CLIENT → APP -->
+<div class="connector-row">
+    <div class="arrow-vertical">↕</div>
+    <div class="flow-label-vertical label-right">REST API Calls (JSON)</div>
+</div>
+
+<!-- APP -->
+<div class="layer-banner" style="background:var(--bg-layer-2);">
+    <div class="layer-header">2. Application Layer</div>
+
+    <div class="box" style="width:60%;max-width:none;background:#FFF3E0;">
+        FastAPI Backend
+        <small>REST Endpoints & Orchestration</small>
+        <small style="margin-top:10px;border-top:1px solid #eee;padding-top:10px;">
+            Handles Post Creation, Search & triggers NER Inference
+        </small>
+    </div>
+</div>
+
+<!-- APP → ML + DATA -->
+<div class="connector-row-split">
+
+    <div class="connector-group">
+        <div class="arrow-vertical">↕</div>
+        <div class="flow-label-vertical label-split-left" style="text-align:right;">
+            Sync Raw Text ↓<br>
+            Extracted Entities ↑
+        </div>
+    </div>
+
+    <div class="connector-group">
+        <div class="arrow-vertical">↕</div>
+        <div class="flow-label-vertical label-split-right">
+            Read / Write Posts<br>
+            Entity Indices ↕
+        </div>
+    </div>
+
+</div>
+
+<!-- ML + DATA -->
+<div style="display:flex;gap:20px;width:100%;">
+
+<!-- ML -->
+<div class="layer-banner" style="background:var(--bg-layer-3);flex:1;">
+    <div class="layer-header">3. Intelligence Layer (ML)</div>
+
+    <div class="box" style="background:#E8F5E9;border-color:#388e3c;padding:20px;width:90%;max-width:none;">
+        Local NER Engine
+        <small style="font-weight:600;color:#388e3c;">(Synchronous CPU Inference)</small>
+
+        <div style="margin-top:15px;font-size:12px;text-align:left;padding-left:10px;border-top:1px solid #a5d6a7;padding-top:10px;line-height:1.5;">
+            • Model: XLM-RoBERTa (Fine-tuned)<br>
+            • Impl: Local Hugging Face Pipeline<br>
+            • Languages: Hindi, Bengali, Marathi, Kannada, Hinglish<br>
+            • Data: COMI-LINGUA & WikiANN<br>
+            • Scheme: Unified BIO / Subword Alignment
+        </div>
+    </div>
+</div>
+
+<!-- DATA -->
+<div class="layer-banner" style="background:var(--bg-layer-4);flex:1;">
+    <div class="layer-header">4. Data Layer</div>
+
+    <div class="box" style="background:#ECEFF1;border-color:#546e7a;padding:20px;width:90%;max-width:none;">
+        NoSQL Database
+        <small>(Firebase / MongoDB)</small>
+
+        <div style="margin-top:15px;font-size:12px;text-align:left;border-top:1px solid #b0bec5;padding-top:12px;line-height:1.6;">
+            • Posts Collection  
+            <small>Stores raw user content</small>
+
+            • Extracted Entities  
+            <small>NER outputs linked to posts</small>
+
+            • Entity Index  
+            <small>Optimized search & trending retrieval</small>
+        </div>
+    </div>
+</div>
+
+</div>
+
+</div>
+</body>
+</html>
