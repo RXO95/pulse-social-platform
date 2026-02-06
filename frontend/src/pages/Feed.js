@@ -1,21 +1,27 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom"; // Import useNavigate
+import { useNavigate } from "react-router-dom"; 
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import LikeButton from "../components/LikeButton";
+import Loader from "../components/Loader";
+import CommentButton from "../components/CommentButton";
+import PostLoader from "../components/PostLoader";
 
 export default function Feed() {
   const [posts, setPosts] = useState([]);
   const [trending, setTrending] = useState([]);
   const [content, setContent] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentUser, setCurrentUser] = useState(null); // Store current user info
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [isPosting, setIsPosting] = useState(false);
 
   const { logout } = useAuth();
-  const navigate = useNavigate(); // Initialize navigation
+  const navigate = useNavigate(); 
   const token = localStorage.getItem("token");
 
-  // --- FETCH CURRENT USER (For Profile Link) ---
+  // --- FETCH CURRENT USER ---
   const fetchCurrentUser = async () => {
     try {
       const res = await fetch(`${API}/users/me`, {
@@ -32,14 +38,23 @@ export default function Feed() {
 
   const fetchPosts = async () => {
     try {
+      setIsLoading(true);
       const res = await fetch(`${API}/posts`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) { logout(); return; }
       const data = await res.json();
-      setPosts(data);
+      // Initialize translation properties for each post
+      const processedPosts = data.map(p => ({
+        ...p,
+        translatedText: null,
+        showTranslation: false
+      }));
+      setPosts(processedPosts);
     } catch {
       alert("Failed to load feed");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -80,6 +95,7 @@ export default function Feed() {
       });
       
       if (res.ok) {
+        // Optimistic UI update or refetch
         fetchPosts(); 
       } else {
         const data = await res.json();
@@ -109,15 +125,91 @@ export default function Feed() {
     }
   };
 
+  // --- NEW: HANDLE TRANSLATION ---
+  const handleTranslate = async (postId, originalText) => {
+    // 1. Find the post in state
+    const postIndex = posts.findIndex(p => p._id === postId);
+    if (postIndex === -1) return;
+    const post = posts[postIndex];
+
+    // 2. If already translated, just toggle visibility
+    if (post.translatedText) {
+      const updatedPosts = [...posts];
+      updatedPosts[postIndex].showTranslation = !updatedPosts[postIndex].showTranslation;
+      setPosts(updatedPosts);
+      return;
+    }
+
+    // 3. If not, fetch translation
+    try {
+      const res = await fetch(`${API}/translate/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ text: originalText, target_lang: "en" })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const updatedPosts = [...posts];
+        updatedPosts[postIndex].translatedText = data.translated_text;
+        updatedPosts[postIndex].showTranslation = true;
+        setPosts(updatedPosts);
+      }
+    } catch {
+      alert("Translation failed");
+    }
+  };
+
+  // --- NEW: HANDLE DELETE POST ---
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm("Are you sure you want to delete this post?")) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API}/posts/${postId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        // Remove from UI
+        setPosts(posts.filter(p => p._id !== postId));
+        setOpenMenuId(null);
+      } else {
+        const data = await res.json();
+        alert(data.detail || "Failed to delete post");
+      }
+    } catch {
+      alert("Could not delete post");
+    }
+  };
+
   useEffect(() => {
     fetchPosts();
     fetchTrending();
-    fetchCurrentUser(); // Fetch user on load
+    fetchCurrentUser(); 
   }, []);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (openMenuId && !e.target.closest('[data-menu]')) {
+        setOpenMenuId(null);
+      }
+    };
+    
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openMenuId]);
 
   const createPost = async () => {
     if (!content.trim()) return;
     try {
+      setIsPosting(true);
       const res = await fetch(`${API}/posts`, {
         method: "POST",
         headers: {
@@ -136,6 +228,8 @@ export default function Feed() {
       fetchTrending();
     } catch {
       alert("Could not create post");
+    } finally {
+      setIsPosting(false);
     }
   };
 
@@ -183,7 +277,11 @@ export default function Feed() {
           </div>
 
           <div style={styles.feedList}>
-            {posts.map((p) => (
+            {isPosting && <PostLoader />}
+            {isLoading ? (
+              <Loader />
+            ) : (
+              posts.map((p) => (
               <div key={p._id} style={styles.postCard}>
                 <div style={styles.postHeader}>
                   <div style={styles.avatar}>{p.username?.charAt(0).toUpperCase()}</div>
@@ -197,24 +295,72 @@ export default function Feed() {
                     >
                       @{p.username}
                     </strong>
-                    <button 
-                      onClick={(e) => {
-                          e.stopPropagation();
-                          handleFollowToggle(p.user_id, p.is_followed_by_user);
-                      }}
-                      style={p.is_followed_by_user ? styles.unfollowBtn : styles.followBtn}
-                    >
-                      {p.is_followed_by_user ? "Following" : "Follow"}
-                    </button>
+                    {currentUser && p.username !== currentUser.username && (
+                      <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleFollowToggle(p.user_id, p.is_followed_by_user);
+                        }}
+                        style={p.is_followed_by_user ? styles.unfollowBtn : styles.followBtn}
+                      >
+                        {p.is_followed_by_user ? "Following" : "Follow"}
+                      </button>
+                    )}
                   </div>
+                  
+                  {/* 3-Dot Menu for Post Owner */}
+                  {currentUser && p.username === currentUser.username && (
+                    <div style={styles.menuContainer} data-menu>
+                      <button 
+                        style={styles.menuButton}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === p._id ? null : p._id);
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f7f9f9"}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                      >
+                        ⋮
+                      </button>
+                      {openMenuId === p._id && (
+                        <div style={styles.dropdown}>
+                          <button 
+                            style={styles.deleteBtn}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeletePost(p._id);
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f7f9f9"}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                          >
+                            Delete Post
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* --- CLICKABLE POST AREA TO NAVIGATE TO POST DETAIL --- */}
+                {/* --- CLICKABLE POST AREA --- */}
                 <div 
                   style={{cursor: "pointer"}} 
                   onClick={() => navigate(`/post/${p._id}`)}
                 >
-                    <p style={styles.postContent}>{p.content}</p>
+                    {/* Toggle between Original and Translated Text */}
+                    <p style={styles.postContent}>
+                      {p.showTranslation ? p.translatedText : p.content}
+                    </p>
+
+                    {/* --- TRANSLATE BUTTON --- */}
+                    <div 
+                      style={styles.translateBtn} 
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent navigating to post details
+                        handleTranslate(p._id, p.content);
+                      }}
+                    >
+                       {p.showTranslation ? "See Original" : "Translate Post"}
+                    </div>
 
                     {p.risk_score > 0.6 && (
                     <div style={styles.riskBadge}>⚠ High Risk Content</div>
@@ -235,16 +381,14 @@ export default function Feed() {
                     count={p.likes || 0}
                     onLike={() => handleLike(p._id)}
                   />
-                  {/* Optional: Add a small comment icon/text to hint at notes */}
-                  <span 
-                    style={{marginLeft: "15px", fontSize: "14px", color: "#666", cursor: "pointer"}}
+                  <CommentButton 
                     onClick={() => navigate(`/post/${p._id}`)}
-                  >
-                    💬 Notes
-                  </span>
+                    count={0}
+                  />
                 </div>
               </div>
-            ))}
+            ))
+            )}
           </div>
         </main>
 
@@ -328,8 +472,6 @@ const styles = {
     fontSize: "14px"
   },
   title: { fontSize: "22px", fontWeight: "800", margin: 0, color: "#764ba2" },
-  
-  // --- BUTTON STYLES ---
   logoutBtn: { 
     background: "none", 
     border: "1px solid #ddd", 
@@ -349,7 +491,6 @@ const styles = {
     fontSize: "14px",
     fontWeight: "600"
   },
-  
   mainContent: {
     flex: 1,
     overflowY: "auto",
@@ -388,11 +529,25 @@ const styles = {
   avatar: { width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "#ffd700", display: "flex", alignItems: "center", justifyContent: "center", marginRight: "12px", fontWeight: "bold" },
   username: { fontSize: "15px" },
   postContent: { fontSize: "16px", margin: "5px 0" },
+  
+  // --- NEW STYLE FOR TRANSLATE BUTTON ---
+  translateBtn: {
+    color: "#1d9bf0",
+    fontSize: "13px",
+    fontWeight: "500",
+    cursor: "pointer",
+    marginBottom: "10px",
+    display: "inline-block"
+  },
+
   riskBadge: { backgroundColor: "#ffeeee", color: "#ff0000", padding: "5px 10px", borderRadius: "4px", fontSize: "12px", marginTop: "8px", display: "inline-block" },
   entityContainer: { display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "10px" },
   tag: { backgroundColor: "#e8f5fd", color: "#1d9bf0", padding: "2px 8px", borderRadius: "4px", fontSize: "12px" },
   tagLabel: { color: "#536471", fontSize: "10px" },
   actionSection: {
+    display: "flex",
+    alignItems: "center",
+    gap: "15px",
     marginTop: "15px",
     paddingTop: "5px",
     borderTop: "1px solid #f0f2f5"
@@ -418,5 +573,46 @@ const styles = {
     fontWeight: "700",
     cursor: "pointer",
     transition: "all 0.2s"
+  },
+  menuContainer: {
+    position: "relative"
+  },
+  menuButton: {
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    padding: "4px 8px",
+    fontSize: "20px",
+    borderRadius: "50%",
+    transition: "background 0.2s",
+    color: "#536471"
+  },
+  dropdown: {
+    position: "absolute",
+    top: "100%",
+    right: 0,
+    backgroundColor: "#fff",
+    border: "1px solid #eff3f4",
+    borderRadius: "12px",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+    minWidth: "150px",
+    zIndex: 10,
+    marginTop: "4px"
+  },
+  deleteBtn: {
+    width: "100%",
+    border: "none",
+    background: "transparent",
+    padding: "12px 16px",
+    textAlign: "left",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+    color: "#f4212e",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    transition: "background 0.2s",
+    borderRadius: "12px"
   }
 };

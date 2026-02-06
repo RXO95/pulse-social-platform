@@ -9,6 +9,11 @@ export default function PostDetail() {
   const [post, setPost] = useState(null);
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState("");
+  
+  // --- NEW: Translation State ---
+  const [translatedText, setTranslatedText] = useState(null);
+  const [showTranslation, setShowTranslation] = useState(false);
+  
   const token = localStorage.getItem("token");
 
   // Fetch Post Details
@@ -66,6 +71,33 @@ export default function PostDetail() {
     }
   };
 
+  // --- NEW: Handle Translation ---
+  const handleTranslate = async () => {
+    if (translatedText) {
+      setShowTranslation(!showTranslation);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API}/translate/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ text: post.content, target_lang: "en" })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setTranslatedText(data.translated_text);
+        setShowTranslation(true);
+      }
+    } catch {
+      alert("Translation failed");
+    }
+  };
+
   useEffect(() => {
     fetchPost();
     fetchNotes();
@@ -83,7 +115,6 @@ export default function PostDetail() {
         <div style={styles.contextHeader}>
           <span style={{fontSize: "18px"}}>ℹ️</span> 
           <strong>Pulse Context</strong> 
-          {/* Badge Removed Here */}
         </div>
 
         {/* Disambiguation Section */}
@@ -133,7 +164,18 @@ export default function PostDetail() {
            <strong style={{fontSize: "16px"}}>@{post.username}</strong>
         </div>
         
-        <p style={styles.content}>{post.content}</p>
+        {/* --- UPDATED: Content with Translation Toggle --- */}
+        <p style={styles.content}>
+          {showTranslation ? translatedText : post.content}
+        </p>
+
+        {/* --- NEW: Translate Button --- */}
+        <div 
+           style={styles.translateBtn} 
+           onClick={handleTranslate}
+        >
+           {showTranslation ? "See Original" : "Translate Post"}
+        </div>
 
         {/* NER TAGS */}
         <div style={styles.entityContainer}>
@@ -144,7 +186,7 @@ export default function PostDetail() {
             ))}
         </div>
 
-        {/* --- PULSE CONTEXT BOX (Inserted Here) --- */}
+        {/* --- PULSE CONTEXT BOX --- */}
         {renderContextBox()}
 
         <div style={{marginTop: 15, paddingTop: 10, borderTop: "1px solid #f0f0f0"}}>
@@ -193,7 +235,17 @@ const styles = {
   avatar: { width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "#ffd700", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" },
   content: { fontSize: "18px", lineHeight: "1.5", margin: "10px 0" },
   
-  entityContainer: { display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "15px", marginBottom: "20px" },
+  // --- NEW: Translate Button Style ---
+  translateBtn: {
+    color: "#1d9bf0",
+    fontSize: "13px",
+    fontWeight: "500",
+    cursor: "pointer",
+    marginBottom: "15px",
+    display: "inline-block"
+  },
+
+  entityContainer: { display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "0px", marginBottom: "20px" },
   tag: { backgroundColor: "#e8f5fd", color: "#1d9bf0", padding: "4px 10px", borderRadius: "15px", fontSize: "13px" },
   tagLabel: { color: "#536471", fontSize: "11px", marginLeft: "4px" },
 
@@ -215,7 +267,6 @@ const styles = {
     paddingBottom: "8px",
     color: "#2F3336"
   },
-  // aiBadge removed
   contextSection: {
     marginBottom: "12px"
   },

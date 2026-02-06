@@ -81,3 +81,31 @@ async def get_post_by_id(post_id: str):
     # 4. Convert ObjectId to string
     post["_id"] = str(post["_id"])
     return post
+
+
+@router.delete("/{post_id}")
+async def delete_post(post_id: str, user=Depends(get_current_user)):
+    # 1. Validate the ID format
+    if not ObjectId.is_valid(post_id):
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+
+    # 2. Fetch the post
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    # 3. Check ownership - only author can delete
+    if post["user_id"] != user["user_id"]:
+        raise HTTPException(status_code=403, detail="You can only delete your own posts")
+
+    # 4. Delete the post
+    await db.posts.delete_one({"_id": ObjectId(post_id)})
+    
+    # 5. Also delete associated comments
+    await db.comments.delete_many({"post_id": post_id})
+    
+    # 6. Delete associated likes
+    await db.likes.delete_many({"post_id": post_id})
+
+    return {"message": "Post deleted successfully"}

@@ -10,6 +10,7 @@ from app.routes.personal_feed import router as personal_feed_router
 from app.routes.trending import router as trending_router
 from app.routes.search import router as search_router
 from app.routes.comments import router as comments_router
+from app.routes.translate import router as translate_router
 
 app = FastAPI(title="Pulse Backend API")
 
@@ -32,6 +33,7 @@ app.include_router(personal_feed_router)
 app.include_router(trending_router)
 app.include_router(search_router)
 app.include_router(comments_router)
+app.include_router(translate_router)
 
 @app.get("/")
 def root():

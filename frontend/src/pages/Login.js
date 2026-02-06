@@ -2,15 +2,18 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
+import Loader from "../components/Loader";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
   const submit = async (e) => {
     e.preventDefault();
+    setIsLoading(true);
 
     try {
       const res = await fetch(
@@ -20,6 +23,7 @@ export default function Login() {
 
       if (!res.ok) {
         alert("Invalid credentials");
+        setIsLoading(false);
         return;
       }
 
@@ -29,6 +33,8 @@ export default function Login() {
 
     } catch {
       alert("Server error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -65,7 +71,11 @@ export default function Login() {
             />
           </div>
 
-          <button style={styles.button}>Login to Pulse</button>
+          {isLoading ? (
+            <Loader />
+          ) : (
+            <button style={styles.button}>Login to Pulse</button>
+          )}
         </form>
 
         <p style={styles.footerText}>

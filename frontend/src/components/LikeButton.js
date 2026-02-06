@@ -34,8 +34,7 @@ const StyledWrapper = styled.div`
   .action-row {
     display: flex;
     align-items: center;
-    gap: 0px;
-    margin-top: 10px;
+    gap: 4px;
   }
 
   .like-count {
