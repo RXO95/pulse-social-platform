@@ -83,7 +83,7 @@ export default function PostDetail() {
         <div style={styles.contextHeader}>
           <span style={{fontSize: "18px"}}>ℹ️</span> 
           <strong>Pulse Context</strong> 
-          <span style={styles.aiBadge}>AI Generated</span>
+          {/* Badge Removed Here */}
         </div>
 
         {/* Disambiguation Section */}
@@ -199,7 +199,7 @@ const styles = {
 
   // --- CONTEXT BOX STYLES ---
   contextBox: {
-    backgroundColor: "#F9F9F9", // Very light gray, distinct from white
+    backgroundColor: "#F9F9F9",
     border: "1px solid #E1E8ED",
     borderRadius: "8px",
     padding: "15px",
@@ -215,15 +215,7 @@ const styles = {
     paddingBottom: "8px",
     color: "#2F3336"
   },
-  aiBadge: {
-    backgroundColor: "#E8F5FD",
-    color: "#1DA1F2",
-    fontSize: "10px",
-    padding: "2px 6px",
-    borderRadius: "4px",
-    fontWeight: "bold",
-    textTransform: "uppercase"
-  },
+  // aiBadge removed
   contextSection: {
     marginBottom: "12px"
   },
