@@ -21,7 +21,7 @@
 
 Pulse is a full-stack social media platform that combines modern web technologies with cutting-edge AI/ML capabilities. Built to address real-world challenges in content moderation for multilingual communities, it features a custom-trained Named Entity Recognition (NER) model specifically designed for Indian languages.
 
-### 🌟 What Makes This Special?
+### What Makes This Special?
 
 - ** Custom AI Model**: Transformer-based NER model trained on Indian language datasets (Hindi, Hinglish, English)
 - ** Microservices Architecture**: Separation of concerns with dedicated ML inference service
@@ -629,7 +629,7 @@ BATCH_SIZE=32
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ### Run Backend Tests
 ```bash
