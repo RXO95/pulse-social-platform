@@ -39,7 +39,7 @@ export default function Feed() {
   const fetchPosts = async () => {
     try {
       setIsLoading(true);
-      const res = await fetch(`${API}/posts`, {
+      const res = await fetch(`${API}/posts/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) { logout(); return; }
@@ -60,7 +60,7 @@ export default function Feed() {
 
   const fetchTrending = async () => {
     try {
-      const res = await fetch(`${API}/trending`, {
+      const res = await fetch(`${API}/trending/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -77,13 +77,22 @@ export default function Feed() {
       return;
     }
     try {
-      const res = await fetch(`${API}/search?q=${encodeURIComponent(query)}`, {
+      const res = await fetch(`${API}/search/?q=${encodeURIComponent(query)}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      
+      if (!res.ok) {
+        console.error("Search failed with status:", res.status);
+        alert("Search failed. Please try again.");
+        return;
+      }
+      
       const data = await res.json();
+      console.log("Search results:", data);
       setPosts(data.results || []);
-    } catch {
-      console.error("Search failed");
+    } catch (error) {
+      console.error("Search error:", error);
+      alert("Search failed. Please check the console for details.");
     }
   };
 
@@ -210,7 +219,7 @@ export default function Feed() {
     if (!content.trim()) return;
     try {
       setIsPosting(true);
-      const res = await fetch(`${API}/posts`, {
+      const res = await fetch(`${API}/posts/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

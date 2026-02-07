@@ -29,7 +29,7 @@ export default function Profile() {
   // Ideally, create a backend endpoint: /posts/user/{username}
   const fetchUserPosts = async () => {
     try {
-      const res = await fetch(`${API}/posts`, {
+      const res = await fetch(`${API}/posts/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {

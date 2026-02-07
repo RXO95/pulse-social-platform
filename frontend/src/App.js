@@ -1,9 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 import Feed from "./pages/Feed";
 import Profile from "./pages/Profile";
-import PostDetail from "./pages/PostDetail"; // 1. Import the new page
+import PostDetail from "./pages/PostDetail";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
 
           <Route path="/" element={<Navigate to="/login" />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
 
           {/* Feed Route */}
           <Route

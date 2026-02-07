@@ -1,36 +1,50 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/api";
-import { useAuth } from "../context/AuthContext";
 import Loader from "../components/Loader";
 import StarsBackground from "../components/StarsBackground";
 
-export default function Login() {
+export default function Signup() {
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
   const navigate = useNavigate();
 
   const submit = async (e) => {
     e.preventDefault();
+
+    if (password !== confirmPassword) {
+      alert("Passwords do not match!");
+      return;
+    }
+
+    if (password.length < 6) {
+      alert("Password must be at least 6 characters long!");
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const res = await fetch(
-        `${API}/auth/login?email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`,
-        { method: "POST" }
-      );
+      const res = await fetch(`${API}/auth/signup`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ username, email, password })
+      });
 
       if (!res.ok) {
-        alert("Invalid credentials");
+        const data = await res.json();
+        alert(data.detail || "Signup failed");
         setIsLoading(false);
         return;
       }
 
-      const data = await res.json();
-      login(data.access_token);
-      navigate("/feed");
+      alert("Account created successfully! Please login.");
+      navigate("/login");
 
     } catch {
       alert("Server error");
@@ -43,18 +57,30 @@ export default function Login() {
     <>
       <StarsBackground />
       <div style={styles.pageWrapper}>
-        <div style={styles.loginCard}>
+        <div style={styles.signupCard}>
           <div style={styles.brandContainer}>
             <div style={styles.logo}>P</div>
             <h1 style={styles.appName}>Pulse</h1>
-            <p style={styles.subtitle}>Welcome back! Please login to your account.</p>
+            <p style={styles.subtitle}>Create your account and join the conversation.</p>
           </div>
 
           <form onSubmit={submit} style={styles.form}>
             <div style={styles.inputGroup}>
+              <label style={styles.label}>Username</label>
+              <input
+                style={styles.input}
+                placeholder="johndoe"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </div>
+
+            <div style={styles.inputGroup}>
               <label style={styles.label}>Email Address</label>
               <input
                 style={styles.input}
+                type="email"
                 placeholder="name@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -74,21 +100,33 @@ export default function Login() {
               />
             </div>
 
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Confirm Password</label>
+              <input
+                style={styles.input}
+                type="password"
+                placeholder="••••••••"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </div>
+
             {isLoading ? (
               <Loader />
             ) : (
-              <button style={styles.button}>Login to Pulse</button>
+              <button style={styles.button}>Create Account</button>
             )}
           </form>
 
           <div style={styles.footer}>
             <p style={styles.footerText}>
-              Don't have an account?{" "}
+              Already have an account?{" "}
               <span 
-                onClick={() => navigate("/signup")} 
+                onClick={() => navigate("/login")} 
                 style={styles.link}
               >
-                Sign up
+                Sign in
               </span>
             </p>
           </div>
@@ -108,7 +146,7 @@ const styles = {
     position: "relative",
     zIndex: 1,
   },
-  loginCard: {
+  signupCard: {
     background: "rgba(255, 255, 255, 0.95)",
     backdropFilter: "blur(10px)",
     borderRadius: "20px",
