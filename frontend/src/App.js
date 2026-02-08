@@ -1,14 +1,18 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Feed from "./pages/Feed";
 import Profile from "./pages/Profile";
 import PostDetail from "./pages/PostDetail";
+import EntityExplore from "./pages/EntityExplore";
+import Bookmarks from "./pages/Bookmarks";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -37,7 +41,7 @@ export default function App() {
             }
           />
 
-          {/* --- NEW POST DETAIL ROUTE --- */}
+          {/* Post Detail Route */}
           <Route
             path="/post/:postId"
             element={
@@ -47,8 +51,29 @@ export default function App() {
             }
           />
 
+          {/* Entity Explore Route - NER Feature */}
+          <Route
+            path="/entity/:entityText"
+            element={
+              <ProtectedRoute>
+                <EntityExplore />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Bookmarks Route */}
+          <Route
+            path="/bookmarks"
+            element={
+              <ProtectedRoute>
+                <Bookmarks />
+              </ProtectedRoute>
+            }
+          />
+
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </ThemeProvider>
   );
 }

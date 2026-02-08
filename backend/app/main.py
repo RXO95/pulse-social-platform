@@ -11,6 +11,8 @@ from app.routes.trending import router as trending_router
 from app.routes.search import router as search_router
 from app.routes.comments import router as comments_router
 from app.routes.translate import router as translate_router
+from app.routes.entities import router as entities_router
+from app.routes.bookmarks import router as bookmarks_router
 
 app = FastAPI(title="Pulse Backend API")
 
@@ -34,6 +36,8 @@ app.include_router(trending_router)
 app.include_router(search_router)
 app.include_router(comments_router)
 app.include_router(translate_router)
+app.include_router(entities_router)
+app.include_router(bookmarks_router)
 
 @app.get("/")
 def root():

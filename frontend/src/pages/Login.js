@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
@@ -11,6 +11,15 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.documentElement.style.backgroundColor = "transparent";
+    document.body.style.backgroundColor = "transparent";
+    return () => {
+      document.documentElement.style.backgroundColor = "";
+      document.body.style.backgroundColor = "";
+    };
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -45,8 +54,7 @@ export default function Login() {
       <div style={styles.pageWrapper}>
         <div style={styles.loginCard}>
           <div style={styles.brandContainer}>
-            <div style={styles.logo}>P</div>
-            <h1 style={styles.appName}>Pulse</h1>
+            <img src="/logo-light.png" alt="Pulse" style={styles.logoImage} />
             <p style={styles.subtitle}>Welcome back! Please login to your account.</p>
           </div>
 
@@ -106,36 +114,29 @@ const styles = {
     justifyContent: "center",
     padding: "20px",
     position: "relative",
-    zIndex: 1,
+    zIndex: 2,
   },
   loginCard: {
-    background: "rgba(255, 255, 255, 0.95)",
-    backdropFilter: "blur(10px)",
-    borderRadius: "20px",
-    padding: "50px 40px",
-    maxWidth: "480px",
+    background: "rgba(255, 255, 255, 0.97)",
+    backdropFilter: "blur(20px)",
+    WebkitBackdropFilter: "blur(20px)",
+    borderRadius: "24px",
+    padding: "48px 40px",
+    maxWidth: "420px",
     width: "100%",
-    boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3), 0 0 40px rgba(59, 130, 246, 0.2)",
-    border: "1px solid rgba(255, 255, 255, 0.3)",
-    animation: "fadeInUp 0.6s ease-out",
+    boxShadow: "0 24px 80px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255,255,255,0.1)",
+    border: "1px solid rgba(255, 255, 255, 0.2)",
   },
   brandContainer: {
     textAlign: "center",
     marginBottom: "35px",
   },
-  logo: {
-    width: "80px",
-    height: "80px",
-    borderRadius: "50%",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
-    color: "white",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontSize: "42px",
-    fontWeight: "bold",
-    margin: "0 auto 20px",
-    boxShadow: "0 10px 30px rgba(102, 126, 234, 0.4)",
+  logoImage: {
+    width: "200px",
+    height: "auto",
+    objectFit: "contain",
+    margin: "0 auto 30px",
+    display: "block"
   },
   appName: {
     fontSize: "32px",
@@ -169,26 +170,26 @@ const styles = {
     width: "100%",
     padding: "14px 16px",
     fontSize: "15px",
-    border: "2px solid #e2e8f0",
+    border: "1.5px solid #e2e8f0",
     borderRadius: "12px",
     outline: "none",
-    transition: "all 0.3s ease",
+    transition: "all 0.2s ease",
     fontFamily: "inherit",
     backgroundColor: "#f8fafc",
+    boxSizing: "border-box",
   },
   button: {
     width: "100%",
-    padding: "16px",
-    fontSize: "16px",
-    fontWeight: "600",
+    padding: "15px",
+    fontSize: "15px",
+    fontWeight: "700",
     color: "white",
-    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    background: "#0f1419",
     border: "none",
-    borderRadius: "12px",
+    borderRadius: "9999px",
     cursor: "pointer",
-    marginTop: "10px",
-    transition: "all 0.3s ease",
-    boxShadow: "0 4px 15px rgba(102, 126, 234, 0.3)",
+    marginTop: "8px",
+    transition: "all 0.2s ease",
   },
   footer: {
     marginTop: "30px",
@@ -199,7 +200,7 @@ const styles = {
     fontSize: "14px",
   },
   link: {
-    color: "#667eea",
+    color: "#1d9bf0",
     fontWeight: "600",
     cursor: "pointer",
     textDecoration: "none",

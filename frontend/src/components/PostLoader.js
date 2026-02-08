@@ -1,9 +1,13 @@
 import React from 'react';
 import styled from 'styled-components';
+import { useTheme, getTheme } from '../context/ThemeContext';
 
 const PostLoader = () => {
+  const { darkMode } = useTheme();
+  const t = getTheme(darkMode);
+
   return (
-    <StyledWrapper>
+    <StyledWrapper $bg={t.cardBg} $border={t.border} $shimmer={darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(227,227,227,0.5)'} $lineBg={darkMode ? '#2f3336' : '#eff3f4'}>
       <div className="loader">
         <div className="wrapper">
           <div className="circle" />
@@ -22,11 +26,10 @@ const StyledWrapper = styled.div`
     position: relative;
     width: 100%;
     height: 130px;
-    margin-bottom: 10px;
-    border: 1px solid #eff3f4;
-    border-radius: 12px;
-    padding: 15px;
-    background-color: #ffffff;
+    margin-bottom: 0;
+    border-bottom: 1px solid ${props => props.$border};
+    padding: 16px;
+    background-color: ${props => props.$bg};
     overflow: hidden;
   }
 
@@ -37,7 +40,7 @@ const StyledWrapper = styled.div`
     height: 100%;
     top: 0;
     left: 0;
-    background: linear-gradient(110deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 40%, rgba(227, 227, 227, 0.5) 50%, rgba(255, 255, 255, 0) 60%, rgba(255, 255, 255, 0) 100%);
+    background: linear-gradient(110deg, transparent 0%, transparent 40%, ${props => props.$shimmer} 50%, transparent 60%, transparent 100%);
     animation: gradient-animation_2 1.2s linear infinite;
   }
 
@@ -48,12 +51,13 @@ const StyledWrapper = styled.div`
   }
 
   .loader .wrapper > div {
-    background-color: #e1e8ed;
+    background-color: ${props => props.$lineBg};
+    border-radius: 4px;
   }
 
   .loader .circle {
-    width: 50px;
-    height: 50px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
   }
 
@@ -65,16 +69,16 @@ const StyledWrapper = styled.div`
 
   .loader .line-1 {
     position: absolute;
-    top: 11px;
-    left: 58px;
+    top: 8px;
+    left: 56px;
     height: 10px;
     width: 100px;
   }
 
   .loader .line-2 {
     position: absolute;
-    top: 34px;
-    left: 58px;
+    top: 28px;
+    left: 56px;
     height: 10px;
     width: 150px;
   }

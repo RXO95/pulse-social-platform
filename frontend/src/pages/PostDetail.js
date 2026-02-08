@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import API from "../api/api";
+import { useTheme, getTheme } from "../context/ThemeContext";
 import LikeButton from "../components/LikeButton";
+import DarkModeToggle from "../components/DarkModeToggle";
+import useIsMobile from "../hooks/useIsMobile";
 
 export default function PostDetail() {
   const { postId } = useParams();
@@ -15,6 +18,10 @@ export default function PostDetail() {
   const [showTranslation, setShowTranslation] = useState(false);
   
   const token = localStorage.getItem("token");
+  const { darkMode } = useTheme();
+  const t = getTheme(darkMode);
+  const mobile = useIsMobile();
+  const styles = getStyles(t, mobile);
 
   // Fetch Post Details
   const fetchPost = async () => {
@@ -103,7 +110,7 @@ export default function PostDetail() {
     fetchNotes();
   }, [postId]);
 
-  if (!post) return <div style={{textAlign:"center", marginTop: 50}}>Loading...</div>;
+  if (!post) return <div style={{textAlign:"center", marginTop: 50, color: t.text}}>Loading...</div>;
 
   // --- HELPER: Context Box Component ---
   const renderContextBox = () => {
@@ -125,7 +132,7 @@ export default function PostDetail() {
               {ctx.disambiguation.map((item, idx) => (
                 <li key={idx}>
                   <strong>{item.entity}</strong> is identified as <strong>{item.identified_as}</strong>
-                  <div style={{color: "#555", fontSize: "13px", marginTop: "2px"}}>
+                  <div style={{color: t.textSecondary, fontSize: "13px", marginTop: "2px"}}>
                     {item.description}
                   </div>
                 </li>
@@ -142,7 +149,7 @@ export default function PostDetail() {
               <a href={ctx.news.url} target="_blank" rel="noopener noreferrer" style={styles.newsLink}>
                 {ctx.news.headline}
               </a>
-              <div style={{fontSize: "11px", color: "#888", marginTop: "4px"}}>Source: Google News</div>
+              <div style={{fontSize: "11px", color: t.textSecondary, marginTop: "4px"}}>Source: Google News</div>
             </div>
           </div>
         )}
@@ -151,17 +158,22 @@ export default function PostDetail() {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.navBar}>
-        <button onClick={() => navigate(-1)} style={styles.backButton}>← Back</button>
-        <h3 style={{margin:0}}>Post Details</h3>
-      </div>
+    <div style={styles.fullScreenWrapper}>
+      <header style={styles.navBar}>
+        <div style={styles.navContent}>
+          <button onClick={() => navigate(-1)} style={styles.backButton}>← Back</button>
+          <h3 style={{margin:0, color: t.text}}>Post Details</h3>
+          <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>
+        </div>
+      </header>
+
+      <div style={styles.scrollArea}>
 
       {/* MAIN POST CARD */}
       <div style={styles.card}>
         <div style={styles.header}>
            <div style={styles.avatar}>{post.username?.charAt(0).toUpperCase()}</div>
-           <strong style={{fontSize: "16px"}}>@{post.username}</strong>
+           <strong style={{fontSize: "16px", color: t.text}}>@{post.username}</strong>
         </div>
         
         {/* --- UPDATED: Content with Translation Toggle --- */}
@@ -189,8 +201,8 @@ export default function PostDetail() {
         {/* --- PULSE CONTEXT BOX --- */}
         {renderContextBox()}
 
-        <div style={{marginTop: 15, paddingTop: 10, borderTop: "1px solid #f0f0f0"}}>
-           <small style={{color:"#666"}}>{new Date(post.created_at).toLocaleString()}</small>
+        <div style={{marginTop: 15, paddingTop: 10, borderTop: `1px solid ${t.border}`}}>
+           <small style={{color: t.textSecondary}}>{new Date(post.created_at).toLocaleString()}</small>
         </div>
       </div>
 
@@ -213,31 +225,33 @@ export default function PostDetail() {
             <div key={note._id} style={styles.noteCard}>
               <div style={styles.noteHeader}>
                 <strong>@{note.username}</strong>
-                <small style={{color:"#888"}}>{new Date(note.created_at).toLocaleDateString()}</small>
+                <small style={{color: t.textSecondary}}>{new Date(note.created_at).toLocaleDateString()}</small>
               </div>
-              <p style={{margin:"5px 0", fontSize:"14px"}}>{note.content}</p>
+              <p style={{margin:"5px 0", fontSize:"14px", color: t.text}}>{note.content}</p>
             </div>
           ))}
-          {notes.length === 0 && <p style={{color:"#888", fontStyle:"italic"}}>No comments yet.</p>}
+          {notes.length === 0 && <p style={{color: t.textSecondary, fontStyle:"italic"}}>No comments yet.</p>}
         </div>
+      </div>
       </div>
     </div>
   );
 }
 
-const styles = {
-  container: { maxWidth: "600px", margin: "0 auto", padding: "0 10px 50px", fontFamily: "sans-serif" },
-  navBar: { display: "flex", gap: "20px", alignItems: "center", padding: "15px 0", borderBottom: "1px solid #eee" },
-  backButton: { background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: "#1d9bf0" },
+function getStyles(t, m) { return {
+  fullScreenWrapper: { height: "100vh", display: "flex", flexDirection: "column", backgroundColor: t.bg, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text, transition: "background-color 0.3s, color 0.3s" },
+  navBar: { height: "53px", backgroundColor: t.headerBg, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", transition: "background-color 0.3s" },
+  navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
+  backButton: { background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: t.accentBlue, fontWeight: "600", flexShrink: 0 },
+  scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", padding: m ? "0" : "0", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
   
-  card: { backgroundColor: "#fff", border: "1px solid #eee", borderRadius: "12px", padding: "20px", marginTop: "20px" },
-  header: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px" },
-  avatar: { width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "#ffd700", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" },
-  content: { fontSize: "18px", lineHeight: "1.5", margin: "10px 0" },
+  card: { backgroundColor: t.cardBg, borderBottom: `1px solid ${t.border}`, padding: m ? "16px" : "20px", transition: "background-color 0.3s" },
+  header: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" },
+  avatar: { width: m ? "40px" : "48px", height: m ? "40px" : "48px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: m ? "16px" : "20px", color: "#1a1a1a", flexShrink: 0 },
+  content: { fontSize: m ? "17px" : "23px", lineHeight: "1.35", margin: "8px 0 12px", color: t.text, wordBreak: "break-word" },
   
-  // --- NEW: Translate Button Style ---
   translateBtn: {
-    color: "#1d9bf0",
+    color: t.accentBlue,
     fontSize: "13px",
     fontWeight: "500",
     cursor: "pointer",
@@ -245,27 +259,28 @@ const styles = {
     display: "inline-block"
   },
 
-  entityContainer: { display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "0px", marginBottom: "20px" },
-  tag: { backgroundColor: "#e8f5fd", color: "#1d9bf0", padding: "4px 10px", borderRadius: "15px", fontSize: "13px" },
-  tagLabel: { color: "#536471", fontSize: "11px", marginLeft: "4px" },
+  entityContainer: { display: "flex", flexWrap: "wrap", gap: m ? "6px" : "8px", marginTop: "0px", marginBottom: "20px" },
+  tag: { backgroundColor: t.tagBg, color: t.tagText, padding: "4px 12px", borderRadius: "9999px", fontSize: m ? "12px" : "13px", fontWeight: "500" },
+  tagLabel: { color: t.textSecondary, fontSize: "11px", marginLeft: "4px" },
 
-  // --- CONTEXT BOX STYLES ---
   contextBox: {
-    backgroundColor: "#F9F9F9",
-    border: "1px solid #E1E8ED",
-    borderRadius: "8px",
-    padding: "15px",
-    marginTop: "15px",
-    marginBottom: "15px"
+    backgroundColor: t.contextBg,
+    border: `1px solid ${t.contextBorder}`,
+    borderRadius: "12px",
+    padding: m ? "14px" : "16px",
+    marginTop: "16px",
+    marginBottom: "16px",
+    transition: "background-color 0.3s"
   },
   contextHeader: {
     display: "flex",
     alignItems: "center",
     gap: "8px",
     marginBottom: "10px",
-    borderBottom: "1px solid #E1E8ED",
+    borderBottom: `1px solid ${t.contextBorder}`,
     paddingBottom: "8px",
-    color: "#2F3336"
+    color: t.text,
+    fontSize: m ? "14px" : "16px"
   },
   contextSection: {
     marginBottom: "12px"
@@ -273,38 +288,40 @@ const styles = {
   contextLabel: {
     fontSize: "12px",
     fontWeight: "bold",
-    color: "#536471",
+    color: t.textSecondary,
     textTransform: "uppercase",
     marginBottom: "6px"
   },
   contextList: {
     listStyleType: "disc",
-    paddingLeft: "20px",
+    paddingLeft: m ? "16px" : "20px",
     margin: 0,
-    fontSize: "14px",
-    color: "#0F1419"
+    fontSize: m ? "13px" : "14px",
+    color: t.text
   },
   newsCard: {
-    backgroundColor: "#fff",
-    border: "1px solid #cfd9de",
+    backgroundColor: t.newsBg,
+    border: `1px solid ${t.border}`,
     borderRadius: "6px",
-    padding: "10px"
+    padding: "10px",
+    transition: "background-color 0.3s"
   },
   newsLink: {
-    color: "#1d9bf0",
+    color: t.accentBlue,
     textDecoration: "none",
     fontWeight: "600",
-    fontSize: "14px",
-    display: "block"
+    fontSize: m ? "13px" : "14px",
+    display: "block",
+    wordBreak: "break-word"
   },
 
-  notesSection: { marginTop: "30px" },
-  sectionTitle: { fontSize: "18px", fontWeight: "bold", marginBottom: "15px" },
+  notesSection: { marginTop: "0", borderTop: `1px solid ${t.border}`, padding: m ? "16px" : "20px" },
+  sectionTitle: { fontSize: "18px", fontWeight: "700", marginBottom: "16px", color: t.text },
   inputGroup: { display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" },
-  textarea: { padding: "12px", borderRadius: "8px", border: "1px solid #ddd", resize: "none", height: "60px", fontFamily: "sans-serif" },
-  postBtn: { alignSelf: "flex-end", backgroundColor: "#1d9bf0", color: "#fff", border: "none", padding: "8px 20px", borderRadius: "20px", fontWeight: "bold", cursor: "pointer" },
+  textarea: { padding: "14px", borderRadius: "12px", border: `1px solid ${t.inputBorder}`, resize: "none", height: "64px", fontFamily: "inherit", backgroundColor: t.inputBg, color: t.text, transition: "background-color 0.3s, border-color 0.2s", fontSize: "15px", outline: "none" },
+  postBtn: { alignSelf: "flex-end", backgroundColor: t.accentBlue, color: "#fff", border: "none", padding: "10px 24px", borderRadius: "9999px", fontWeight: "700", fontSize: "15px", cursor: "pointer", transition: "all 0.2s" },
   
-  notesList: { display: "flex", flexDirection: "column", gap: "12px" },
-  noteCard: { backgroundColor: "#f8f9fa", borderRadius: "8px", padding: "12px", border: "1px solid #eee" },
-  noteHeader: { display: "flex", justifyContent: "space-between", marginBottom: "5px", fontSize: "13px" }
-};
+  notesList: { display: "flex", flexDirection: "column", gap: "0" },
+  noteCard: { backgroundColor: "transparent", padding: m ? "12px 0" : "14px 0", borderBottom: `1px solid ${t.border}`, transition: "background-color 0.3s" },
+  noteHeader: { display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "13px", color: t.text }
+}; }

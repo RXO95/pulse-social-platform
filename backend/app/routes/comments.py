@@ -3,6 +3,7 @@ from bson import ObjectId
 from datetime import datetime
 from app.services.database import db
 from app.auth.dependency import get_current_user
+from app.services.ml_client import analyze_text
 
 router = APIRouter(prefix="/comments", tags=["Community Notes"])
 
@@ -10,6 +11,7 @@ router = APIRouter(prefix="/comments", tags=["Community Notes"])
 async def add_community_note(post_id: str, payload: dict, user=Depends(get_current_user)):
     """
     Add a new Community Note (Comment) to a post.
+    Comments also go through NER analysis to extract entities.
     """
     if not payload.get("content"):
         raise HTTPException(status_code=400, detail="Content cannot be empty")
@@ -21,12 +23,31 @@ async def add_community_note(post_id: str, payload: dict, user=Depends(get_curre
             raise HTTPException(status_code=404, detail="Post not found")
     except:
         raise HTTPException(status_code=400, detail="Invalid Post ID")
+    
+    content = payload["content"]
+    
+    # Run NER on comment content
+    try:
+        analysis = await analyze_text(content)
+        entities = analysis.get("entities", [])
+        risk_score = analysis.get("risk_score", 0)
+    except:
+        entities = []
+        risk_score = 0
+    
+    # Block high-risk comments
+    if risk_score > 0.6:
+        raise HTTPException(
+            status_code=403,
+            detail="Comment blocked due to sensitive content"
+        )
 
     note = {
         "post_id": post_id,
         "user_id": user["user_id"],
         "username": user["username"],
-        "content": payload["content"],
+        "content": content,
+        "entities": entities,  # NER entities from comment
         "created_at": datetime.utcnow()
     }
 

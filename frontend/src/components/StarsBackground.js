@@ -22,7 +22,7 @@ const StyledWrapper = styled.div`
     width: 100vw;
     background: radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%);
     overflow: hidden;
-    z-index: -1;
+    z-index: 0;
   }
 
   #stars {

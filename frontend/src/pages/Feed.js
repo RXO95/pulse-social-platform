@@ -2,10 +2,29 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom"; 
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
+import { useTheme, getTheme } from "../context/ThemeContext";
 import LikeButton from "../components/LikeButton";
 import Loader from "../components/Loader";
 import CommentButton from "../components/CommentButton";
+import BookmarkButton from "../components/BookmarkButton";
 import PostLoader from "../components/PostLoader";
+import DarkModeToggle from "../components/DarkModeToggle";
+import useIsMobile from "../hooks/useIsMobile";
+
+function timeAgo(dateString) {
+  if (!dateString) return "";
+  const now = new Date();
+  const date = new Date(dateString);
+  const seconds = Math.floor((now - date) / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
 
 export default function Feed() {
   const [posts, setPosts] = useState([]);
@@ -20,6 +39,10 @@ export default function Feed() {
   const { logout } = useAuth();
   const navigate = useNavigate(); 
   const token = localStorage.getItem("token");
+  const { darkMode } = useTheme();
+  const t = getTheme(darkMode);
+  const mobile = useIsMobile();
+  const styles = getStyles(t, mobile);
 
   // --- FETCH CURRENT USER ---
   const fetchCurrentUser = async () => {
@@ -197,6 +220,26 @@ export default function Feed() {
     }
   };
 
+  // --- HANDLE BOOKMARK ---
+  const handleBookmark = async (postId) => {
+    try {
+      const res = await fetch(`${API}/bookmarks/${postId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Update UI optimistically
+        setPosts(posts.map(p => 
+          p._id === postId ? { ...p, is_bookmarked: data.bookmarked } : p
+        ));
+      }
+    } catch {
+      console.error("Bookmark failed");
+    }
+  };
+
   useEffect(() => {
     fetchPosts();
     fetchTrending();
@@ -247,8 +290,7 @@ export default function Feed() {
       <header style={styles.header}>
         <div style={styles.headerContent}>
           <div style={styles.logoGroup}>
-             <div style={styles.smallLogo}>P</div>
-             <h2 style={styles.title}>Pulse</h2>
+             <img src={darkMode ? "/logo-dark.png" : "/logo-light.png"} alt="Pulse" style={styles.logoImage} />
           </div>
           
           <input 
@@ -259,14 +301,33 @@ export default function Feed() {
             style={styles.searchInput}
           />
 
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div style={{ display: "flex", gap: mobile ? "6px" : "10px", alignItems: "center" }}>
+            <DarkModeToggle />
             <button 
-              onClick={() => currentUser && navigate(`/profile/${currentUser.username}`)}
+              onClick={() => navigate("/bookmarks")}
               style={styles.profileBtn}
+              aria-label="Bookmarks"
             >
-              Profile
+              {mobile ? "🔖" : "Bookmarks"}
             </button>
-            <button onClick={logout} style={styles.logoutBtn}>Logout</button>
+            {!mobile && (
+              <button 
+                onClick={() => currentUser && navigate(`/profile/${currentUser.username}`)}
+                style={styles.profileBtn}
+              >
+                Profile
+              </button>
+            )}
+            {mobile && (
+              <button 
+                onClick={() => currentUser && navigate(`/profile/${currentUser.username}`)}
+                style={styles.profileBtn}
+                aria-label="Profile"
+              >
+                👤
+              </button>
+            )}
+            <button onClick={logout} style={styles.logoutBtn}>{mobile ? "↗" : "Logout"}</button>
           </div>
         </div>
       </header>
@@ -274,14 +335,19 @@ export default function Feed() {
       <div style={styles.layoutBody}>
         <main style={styles.mainContent}>
           <div style={styles.card}>
-            <textarea
-              placeholder="What's happening?"
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              style={styles.textarea}
-            />
-            <div style={styles.buttonContainer}>
-              <button onClick={createPost} style={styles.postButton}>Post</button>
+            <div style={{display: "flex", gap: "12px"}}>
+              <div style={styles.composeAvatar}>{currentUser?.username?.charAt(0).toUpperCase() || "?"}</div>
+              <div style={{flex: 1, minWidth: 0}}>
+                <textarea
+                  placeholder="What's happening?"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  style={styles.textarea}
+                />
+                <div style={styles.buttonContainer}>
+                  <button onClick={createPost} style={{...styles.postButton, opacity: content.trim() ? 1 : 0.5}}>Post</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -295,15 +361,18 @@ export default function Feed() {
                 <div style={styles.postHeader}>
                   <div style={styles.avatar}>{p.username?.charAt(0).toUpperCase()}</div>
                   <div style={styles.userMeta}>
-                    <strong 
-                      style={{...styles.username, cursor: "pointer"}}
-                      onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/profile/${p.username}`);
-                      }}
-                    >
-                      @{p.username}
-                    </strong>
+                    <div style={styles.usernameRow}>
+                      <strong 
+                        style={{...styles.username, cursor: "pointer"}}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/profile/${p.username}`);
+                        }}
+                      >
+                        @{p.username}
+                      </strong>
+                      <span style={styles.timestamp}>· {timeAgo(p.created_at)}</span>
+                    </div>
                     {currentUser && p.username !== currentUser.username && (
                       <button 
                         onClick={(e) => {
@@ -326,7 +395,7 @@ export default function Feed() {
                           e.stopPropagation();
                           setOpenMenuId(openMenuId === p._id ? null : p._id);
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f7f9f9"}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = t.hoverBg}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                       >
                         ⋮
@@ -339,7 +408,7 @@ export default function Feed() {
                               e.stopPropagation();
                               handleDeletePost(p._id);
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#f7f9f9"}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = t.hoverBg}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
                           >
                             Delete Post
@@ -377,7 +446,14 @@ export default function Feed() {
 
                     <div style={styles.entityContainer}>
                     {p.entities?.map((e, idx) => (
-                        <span key={idx} style={styles.tag}>
+                        <span 
+                          key={idx} 
+                          style={{...styles.tag, cursor: "pointer"}}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            navigate(`/entity/${encodeURIComponent(e.text)}`);
+                          }}
+                        >
                         {e.text} <small style={styles.tagLabel}>{e.label}</small>
                         </span>
                     ))}
@@ -392,7 +468,11 @@ export default function Feed() {
                   />
                   <CommentButton 
                     onClick={() => navigate(`/post/${p._id}`)}
-                    count={0}
+                    count={p.comment_count || 0}
+                  />
+                  <BookmarkButton 
+                    isBookmarked={p.is_bookmarked}
+                    onToggle={() => handleBookmark(p._id)}
                   />
                 </div>
               </div>
@@ -411,7 +491,7 @@ export default function Feed() {
                 <div style={styles.trendingCount}>{item.count} posts</div>
               </div>
             )) : (
-              <p style={{ fontSize: "14px", color: "#666" }}>Nothing trending yet...</p>
+              <p style={{ fontSize: "14px", color: t.textSecondary }}>Nothing trending yet...</p>
             )}
           </div>
         </aside>
@@ -420,128 +500,142 @@ export default function Feed() {
   );
 }
 
-const styles = {
+function getStyles(t, m) { return {
   fullScreenWrapper: {
     height: "100vh",
     display: "flex",
     flexDirection: "column",
-    backgroundColor: "#f0f2f5",
-    fontFamily: '-apple-system, system-ui, sans-serif',
-    overflow: "hidden"
+    backgroundColor: t.bg,
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    overflow: "hidden",
+    color: t.text,
+    transition: "background-color 0.3s, color 0.3s"
   },
   header: {
-    height: "70px",
-    backgroundColor: "#ffffff",
-    borderBottom: "1px solid #ddd",
+    height: m ? "53px" : "53px",
+    backgroundColor: t.headerBg,
+    borderBottom: `1px solid ${t.border}`,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     position: "sticky",
     top: 0,
-    zIndex: 100
+    zIndex: 100,
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    transition: "background-color 0.3s"
   },
   headerContent: {
     width: "100%",
-    maxWidth: "1100px",
+    maxWidth: "1280px",
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: "0 20px",
-    gap: "15px"
+    padding: m ? "0 12px" : "0 24px",
+    gap: m ? "8px" : "16px"
   },
   layoutBody: {
     display: "flex",
     justifyContent: "center",
     width: "100%",
-    maxWidth: "1100px",
+    maxWidth: "1280px",
     margin: "0 auto",
-    gap: "30px",
+    gap: "0",
     flex: 1,
     overflow: "hidden"
   },
   logoGroup: { display: "flex", alignItems: "center", gap: "10px" },
-  smallLogo: {
-    width: "30px",
-    height: "30px",
-    backgroundColor: "#764ba2",
-    color: "white",
-    borderRadius: "8px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    fontWeight: "bold"
+  logoImage: {
+    height: m ? "28px" : "34px",
+    width: "auto",
+    objectFit: "contain"
   },
   searchInput: {
     flex: 1,
-    padding: "10px 15px",
-    borderRadius: "20px",
-    border: "1px solid #ddd",
-    backgroundColor: "#f0f2f5",
+    minWidth: 0,
+    padding: m ? "8px 12px" : "10px 15px",
+    borderRadius: "9999px",
+    border: `1px solid ${t.inputBorder}`,
+    backgroundColor: t.inputBg,
+    color: t.text,
     outline: "none",
-    fontSize: "14px"
+    fontSize: "15px",
+    transition: "background-color 0.3s, border-color 0.3s"
   },
-  title: { fontSize: "22px", fontWeight: "800", margin: 0, color: "#764ba2" },
+  title: { fontSize: "22px", fontWeight: "800", margin: 0, color: t.accent },
   logoutBtn: { 
-    background: "none", 
-    border: "1px solid #ddd", 
-    borderRadius: "20px", 
-    padding: "5px 15px", 
+    background: "transparent", 
+    border: `1px solid ${t.border}`, 
+    borderRadius: "9999px", 
+    padding: m ? "6px 12px" : "8px 18px", 
     cursor: "pointer",
     fontSize: "14px",
-    fontWeight: "500"
+    fontWeight: "600",
+    color: t.text,
+    flexShrink: 0,
+    transition: "all 0.2s"
   },
   profileBtn: {
-    backgroundColor: "#1a1a1a",
-    color: "white",
+    backgroundColor: t.accent,
+    color: "#ffffff",
     border: "none",
-    borderRadius: "20px",
-    padding: "5px 15px",
+    borderRadius: "9999px",
+    padding: m ? "6px 12px" : "8px 18px",
     cursor: "pointer",
     fontSize: "14px",
-    fontWeight: "600"
+    fontWeight: "700",
+    flexShrink: 0,
+    transition: "all 0.2s"
   },
   mainContent: {
     flex: 1,
     overflowY: "auto",
-    padding: "20px 0",
-    maxWidth: "600px"
+    padding: "0",
+    maxWidth: "600px",
+    width: "100%",
+    borderRight: m ? "none" : `1px solid ${t.border}`,
+    borderLeft: m ? "none" : `1px solid ${t.border}`,
   },
   sidebar: {
     width: "350px",
-    padding: "20px 0",
-    display: "block",
+    padding: "12px 24px",
+    display: m ? "none" : "block",
+    overflowY: "auto",
   },
   trendingCard: {
-    backgroundColor: "#fff",
+    backgroundColor: t.cardBg,
     borderRadius: "16px",
-    padding: "16px",
-    boxShadow: "0 1px 2px rgba(0,0,0,0.1)",
-  },
-  trendingTitle: { fontSize: "18px", fontWeight: "800", marginBottom: "15px" },
-  trendingItem: {
     padding: "12px 0",
-    cursor: "pointer",
-    borderBottom: "1px solid #f0f2f5",
-    transition: "background 0.2s"
+    border: `1px solid ${t.border}`,
+    transition: "background-color 0.3s",
+    overflow: "hidden"
   },
-  trendingLabel: { fontSize: "11px", color: "#65676b", textTransform: "uppercase", fontWeight: "600" },
-  trendingTopic: { fontSize: "15px", fontWeight: "700", margin: "2px 0", color: "#1a1a1a" },
-  trendingCount: { fontSize: "13px", color: "#65676b" },
-  card: { backgroundColor: "#fff", borderRadius: "12px", padding: "16px", boxShadow: "0 1px 2px rgba(0,0,0,0.1)", marginBottom: "16px" },
-  textarea: { width: "100%", height: "80px", border: "none", outline: "none", fontSize: "18px", resize: "none" },
-  buttonContainer: { display: "flex", justifyContent: "flex-end", borderTop: "1px solid #eff3f4", paddingTop: "10px" },
-  postButton: { backgroundColor: "#1d9bf0", color: "#fff", border: "none", padding: "10px 24px", borderRadius: "30px", fontWeight: "bold", cursor: "pointer" },
-  feedList: { display: "flex", flexDirection: "column", gap: "12px", paddingBottom: "100px" },
-  postCard: { backgroundColor: "#fff", borderRadius: "12px", padding: "16px", border: "1px solid #eff3f4" },
-  postHeader: { display: "flex", alignItems: "center", marginBottom: "8px" },
-  userMeta: { display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1 },
-  avatar: { width: "40px", height: "40px", borderRadius: "50%", backgroundColor: "#ffd700", display: "flex", alignItems: "center", justifyContent: "center", marginRight: "12px", fontWeight: "bold" },
-  username: { fontSize: "15px" },
-  postContent: { fontSize: "16px", margin: "5px 0" },
+  trendingTitle: { fontSize: "20px", fontWeight: "800", padding: "4px 16px 12px", margin: 0, color: t.text },
+  trendingItem: {
+    padding: "12px 16px",
+    cursor: "pointer",
+    transition: "background 0.15s"
+  },
+  trendingLabel: { fontSize: "13px", color: t.textSecondary, fontWeight: "400" },
+  trendingTopic: { fontSize: "15px", fontWeight: "700", margin: "2px 0", color: t.text },
+  trendingCount: { fontSize: "13px", color: t.textSecondary },
+  composeAvatar: { width: "40px", height: "40px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", color: "#1a1a1a", fontSize: "16px", flexShrink: 0 },
+  card: { backgroundColor: t.cardBg, padding: m ? "12px" : "16px", borderBottom: `1px solid ${t.border}`, transition: "background-color 0.3s" },
+  textarea: { width: "100%", minHeight: m ? "52px" : "56px", border: "none", outline: "none", fontSize: m ? "18px" : "20px", resize: "none", backgroundColor: "transparent", color: t.text, lineHeight: "1.4", padding: "8px 0" },
+  buttonContainer: { display: "flex", justifyContent: "flex-end", borderTop: `1px solid ${t.border}`, paddingTop: "12px", marginTop: "8px" },
+  postButton: { backgroundColor: t.accentBlue, color: "#fff", border: "none", padding: m ? "8px 20px" : "10px 24px", borderRadius: "9999px", fontWeight: "700", fontSize: "15px", cursor: "pointer", transition: "all 0.2s" },
+  feedList: { display: "flex", flexDirection: "column", gap: "0", paddingBottom: "100px" },
+  postCard: { backgroundColor: t.cardBg, padding: m ? "12px 12px 4px" : "16px 16px 4px", borderBottom: `1px solid ${t.border}`, transition: "background-color 0.15s" },
+  postHeader: { display: "flex", alignItems: "flex-start", marginBottom: "4px" },
+  userMeta: { display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1, minWidth: 0, gap: "8px" },
+  avatar: { width: m ? "38px" : "40px", height: m ? "38px" : "40px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", marginRight: "12px", fontWeight: "700", color: "#1a1a1a", fontSize: m ? "15px" : "16px", flexShrink: 0 },
+  usernameRow: { display: "flex", alignItems: "center", gap: "4px", overflow: "hidden" },
+  username: { fontSize: "15px", fontWeight: "700", color: t.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  timestamp: { fontSize: "14px", color: t.textSecondary, whiteSpace: "nowrap", flexShrink: 0 },
+  postContent: { fontSize: "15px", lineHeight: "1.5", margin: "4px 0 8px 0", color: t.text, wordBreak: "break-word" },
   
-  // --- NEW STYLE FOR TRANSLATE BUTTON ---
   translateBtn: {
-    color: "#1d9bf0",
+    color: t.accentBlue,
     fontSize: "13px",
     fontWeight: "500",
     cursor: "pointer",
@@ -549,39 +643,40 @@ const styles = {
     display: "inline-block"
   },
 
-  riskBadge: { backgroundColor: "#ffeeee", color: "#ff0000", padding: "5px 10px", borderRadius: "4px", fontSize: "12px", marginTop: "8px", display: "inline-block" },
+  riskBadge: { backgroundColor: t.riskBg, color: t.riskText, padding: "5px 10px", borderRadius: "4px", fontSize: "12px", marginTop: "8px", display: "inline-block" },
   entityContainer: { display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "10px" },
-  tag: { backgroundColor: "#e8f5fd", color: "#1d9bf0", padding: "2px 8px", borderRadius: "4px", fontSize: "12px" },
-  tagLabel: { color: "#536471", fontSize: "10px" },
+  tag: { backgroundColor: t.tagBg, color: t.tagText, padding: "3px 10px", borderRadius: "9999px", fontSize: m ? "12px" : "13px", fontWeight: "500" },
+  tagLabel: { color: t.textSecondary, fontSize: "11px", marginLeft: "2px" },
   actionSection: {
     display: "flex",
     alignItems: "center",
-    gap: "15px",
-    marginTop: "15px",
-    paddingTop: "5px",
-    borderTop: "1px solid #f0f2f5"
+    gap: m ? "16px" : "24px",
+    marginTop: "8px",
+    paddingTop: "4px"
   },
   followBtn: {
-    backgroundColor: "#1a1a1a",
-    color: "#fff",
+    backgroundColor: t.text === "#e7e9ea" ? "#eff3f4" : "#0f1419",
+    color: t.text === "#e7e9ea" ? "#0f1419" : "#ffffff",
     border: "none",
-    borderRadius: "20px",
-    padding: "6px 16px",
-    fontSize: "14px",
+    borderRadius: "9999px",
+    padding: m ? "4px 14px" : "6px 16px",
+    fontSize: "13px",
     fontWeight: "700",
     cursor: "pointer",
-    transition: "background 0.2s"
+    transition: "all 0.2s",
+    flexShrink: 0
   },
   unfollowBtn: {
     backgroundColor: "transparent",
-    color: "#1a1a1a",
-    border: "1px solid #ddd",
-    borderRadius: "20px",
-    padding: "6px 16px",
-    fontSize: "14px",
+    color: t.text,
+    border: `1px solid ${t.border}`,
+    borderRadius: "9999px",
+    padding: m ? "4px 14px" : "6px 16px",
+    fontSize: "13px",
     fontWeight: "700",
     cursor: "pointer",
-    transition: "all 0.2s"
+    transition: "all 0.2s",
+    flexShrink: 0
   },
   menuContainer: {
     position: "relative"
@@ -594,19 +689,20 @@ const styles = {
     fontSize: "20px",
     borderRadius: "50%",
     transition: "background 0.2s",
-    color: "#536471"
+    color: t.textSecondary
   },
   dropdown: {
     position: "absolute",
     top: "100%",
     right: 0,
-    backgroundColor: "#fff",
-    border: "1px solid #eff3f4",
+    backgroundColor: t.cardBg,
+    border: `1px solid ${t.border}`,
     borderRadius: "12px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-    minWidth: "150px",
+    boxShadow: "0 4px 24px rgba(0,0,0,0.15)",
+    minWidth: "160px",
     zIndex: 10,
-    marginTop: "4px"
+    marginTop: "4px",
+    overflow: "hidden"
   },
   deleteBtn: {
     width: "100%",
@@ -617,11 +713,11 @@ const styles = {
     cursor: "pointer",
     fontSize: "14px",
     fontWeight: "500",
-    color: "#f4212e",
+    color: t.riskText,
     display: "flex",
     alignItems: "center",
     gap: "8px",
     transition: "background 0.2s",
     borderRadius: "12px"
   }
-};
+}; }

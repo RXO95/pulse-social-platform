@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import API from "../api/api";
+import { useTheme, getTheme } from "../context/ThemeContext";
 import LikeButton from "../components/LikeButton";
+import DarkModeToggle from "../components/DarkModeToggle";
+import useIsMobile from "../hooks/useIsMobile";
 
 export default function Profile() {
   const { username } = useParams();
@@ -9,6 +12,10 @@ export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const token = localStorage.getItem("token");
+  const { darkMode } = useTheme();
+  const t = getTheme(darkMode);
+  const mobile = useIsMobile();
+  const styles = getStyles(t, mobile);
 
   // Fetch Profile Info
   const fetchProfile = async () => {
@@ -66,15 +73,19 @@ export default function Profile() {
     fetchUserPosts();
   }, [username]);
 
-  if (!profile) return <div style={{textAlign:"center", marginTop: 50}}>Loading...</div>;
+  if (!profile) return <div style={{textAlign:"center", marginTop: 50, color: t.text}}>Loading...</div>;
 
   return (
-    <div style={styles.container}>
-      {/* HEADER / NAV */}
-      <div style={styles.navBar}>
-        <button onClick={() => navigate("/feed")} style={styles.backButton}>← Back</button>
-        <h3 style={{margin:0}}>@{profile.username}</h3>
-      </div>
+    <div style={styles.fullScreenWrapper}>
+      <header style={styles.navBar}>
+        <div style={styles.navContent}>
+          <button onClick={() => navigate("/feed")} style={styles.backButton}>← Back</button>
+          <h3 style={{margin:0, color: t.text}}>@{profile.username}</h3>
+          <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>
+        </div>
+      </header>
+
+      <div style={styles.scrollArea}>
 
       {/* PROFILE HEADER CARD */}
       <div style={styles.profileHeader}>
@@ -121,38 +132,41 @@ export default function Profile() {
             </div>
           </div>
         ))}
-        {posts.length === 0 && <p style={{color:"#888", textAlign:"center"}}>No posts yet.</p>}
+        {posts.length === 0 && <p style={{color: t.textSecondary, textAlign:"center"}}>No posts yet.</p>}
+      </div>
       </div>
     </div>
   );
 }
 
-const styles = {
-  container: { maxWidth: "600px", margin: "0 auto", paddingBottom: "50px", fontFamily: "sans-serif" },
-  navBar: { display: "flex", gap: "20px", alignItems: "center", padding: "15px", borderBottom: "1px solid #eee" },
-  backButton: { background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: "#1d9bf0" },
+function getStyles(t, m) { return {
+  fullScreenWrapper: { height: "100vh", display: "flex", flexDirection: "column", backgroundColor: t.bg, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text, transition: "background-color 0.3s, color 0.3s" },
+  navBar: { height: "53px", backgroundColor: t.headerBg, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", transition: "background-color 0.3s" },
+  navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
+  backButton: { background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: t.accentBlue, fontWeight: "600", flexShrink: 0 },
+  scrollArea: { flex: 1, overflowY: "auto" },
   
-  profileHeader: { borderBottom: "1px solid #eee", paddingBottom: "20px" },
-  coverImage: { height: "150px", background: "linear-gradient(135deg, #764ba2, #667eea)" },
-  headerContent: { padding: "0 20px", marginTop: "-50px", position: "relative" },
-  avatarLarge: { width: "100px", height: "100px", borderRadius: "50%", border: "4px solid white", backgroundColor: "#ffd700", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "40px", fontWeight: "bold" },
+  profileHeader: { borderBottom: `1px solid ${t.border}`, paddingBottom: "20px", maxWidth: "600px", margin: "0 auto", width: "100%", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
+  coverImage: { height: m ? "130px" : "200px", background: t.coverGradient },
+  headerContent: { padding: m ? "0 16px" : "0 20px", marginTop: "-48px", position: "relative" },
+  avatarLarge: { width: m ? "82px" : "134px", height: m ? "82px" : "134px", borderRadius: "50%", border: `4px solid ${t.bg}`, backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: m ? "32px" : "52px", fontWeight: "800", color: "#1a1a1a" },
   
-  actionRow: { display: "flex", justifyContent: "flex-end", marginTop: "-40px", marginBottom: "20px" },
-  name: { fontSize: "24px", margin: "10px 0 5px 0" },
-  bio: { color: "#555", marginBottom: "15px" },
-  statsRow: { display: "flex", gap: "20px", fontSize: "14px" },
-  stat: { color: "#333" },
+  actionRow: { display: "flex", justifyContent: "flex-end", marginTop: m ? "-35px" : "-50px", marginBottom: "12px" },
+  name: { fontSize: m ? "20px" : "22px", fontWeight: "800", margin: "12px 0 2px 0", color: t.text },
+  bio: { color: t.textSecondary, marginBottom: "12px", fontSize: "15px", lineHeight: "1.4" },
+  statsRow: { display: "flex", gap: m ? "16px" : "20px", fontSize: "14px", flexWrap: "wrap" },
+  stat: { color: t.textSecondary, cursor: "pointer" },
   
-  sectionTitle: { padding: "15px 20px 5px", margin: 0 },
-  feedList: { display: "flex", flexDirection: "column", gap: "10px", padding: "10px" },
-  postCard: { backgroundColor: "#fff", border: "1px solid #eee", borderRadius: "12px", padding: "15px" },
-  postHeader: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" },
-  avatarSmall: { width: "30px", height: "30px", borderRadius: "50%", backgroundColor: "#ffd700", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "bold" },
-  username: { fontSize: "15px" },
-  postContent: { fontSize: "16px", margin: "5px 0" },
-  entityContainer: { display: "flex", gap: "5px", marginTop: "8px" },
-  tag: { backgroundColor: "#e8f5fd", color: "#1d9bf0", padding: "2px 8px", borderRadius: "4px", fontSize: "12px" },
+  sectionTitle: { padding: "16px 16px 8px", margin: 0, color: t.text, fontSize: "16px", fontWeight: "700", borderBottom: `1px solid ${t.border}` },
+  feedList: { display: "flex", flexDirection: "column", gap: "0", padding: "0", maxWidth: "600px", margin: "0 auto", width: "100%", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
+  postCard: { backgroundColor: t.cardBg, borderBottom: `1px solid ${t.border}`, padding: m ? "12px 16px" : "16px 20px", transition: "background-color 0.15s" },
+  postHeader: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" },
+  avatarSmall: { width: "32px", height: "32px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", color: "#1a1a1a", flexShrink: 0 },
+  username: { fontSize: "15px", fontWeight: "700", color: t.text },
+  postContent: { fontSize: "15px", lineHeight: "1.5", margin: "4px 0", color: t.text, wordBreak: "break-word" },
+  entityContainer: { display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" },
+  tag: { backgroundColor: t.tagBg, color: t.tagText, padding: "3px 10px", borderRadius: "9999px", fontSize: m ? "12px" : "13px", fontWeight: "500" },
 
-  followBtn: { backgroundColor: "#1a1a1a", color: "#fff", border: "none", borderRadius: "20px", padding: "8px 20px", fontWeight: "bold", cursor: "pointer" },
-  unfollowBtn: { backgroundColor: "transparent", color: "#1a1a1a", border: "1px solid #ddd", borderRadius: "20px", padding: "8px 20px", fontWeight: "bold", cursor: "pointer" }
-};
+  followBtn: { backgroundColor: t.text === "#e7e9ea" ? "#eff3f4" : "#0f1419", color: t.text === "#e7e9ea" ? "#0f1419" : "#ffffff", border: "none", borderRadius: "9999px", padding: m ? "8px 20px" : "10px 24px", fontWeight: "700", cursor: "pointer", fontSize: "15px", transition: "all 0.2s" },
+  unfollowBtn: { backgroundColor: "transparent", color: t.text, border: `1px solid ${t.border}`, borderRadius: "9999px", padding: m ? "8px 20px" : "10px 24px", fontWeight: "700", cursor: "pointer", fontSize: "15px", transition: "all 0.2s" }
+}; }

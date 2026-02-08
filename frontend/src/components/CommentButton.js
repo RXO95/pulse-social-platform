@@ -45,7 +45,7 @@ const StyledWrapper = styled.div`
   }
 
   .comment-container {
-    --comment-color: #764ba2; /* Pulse Purple - same as like button */
+    --comment-color: #1d9bf0; /* Twitter Blue */
     position: relative;
     width: 40px;
     height: 40px;
@@ -57,7 +57,7 @@ const StyledWrapper = styled.div`
   }
 
   .comment-container:hover {
-    background-color: rgba(118, 75, 162, 0.1);
+    background-color: rgba(29, 155, 240, 0.1);
   }
 
   .comment-container .svg-container {
@@ -76,7 +76,7 @@ const StyledWrapper = styled.div`
   }
 
   .comment-container:hover .svg-outline {
-    color: #764ba2;
+    color: #1d9bf0;
     transform: scale(1.1);
   }
 

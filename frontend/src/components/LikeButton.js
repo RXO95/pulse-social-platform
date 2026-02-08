@@ -44,7 +44,7 @@ const StyledWrapper = styled.div`
   }
 
   .heart-container {
-    --heart-color: #764ba2; /* Pulse Purple */
+    --heart-color: #f91880; /* Twitter Pink */
     position: relative;
     width: 40px;
     height: 40px;

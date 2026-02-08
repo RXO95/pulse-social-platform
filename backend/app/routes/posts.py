@@ -56,10 +56,41 @@ async def create_post(
 
 
 @router.get("/")
-async def get_posts():
+async def get_posts(user=Depends(get_current_user)):
+    user_id = user["user_id"]
     posts = []
-    async for post in db.posts.find().sort("created_at", -1):
+    async for post in db.posts.find().sort("created_at", -1).limit(100):
         post["_id"] = str(post["_id"])
+        post_id = post["_id"]
+        
+        # Add comment count
+        comment_count = await db.comments.count_documents({"post_id": post_id})
+        post["comment_count"] = comment_count
+        
+        # Check if user liked this post
+        is_liked = await db.likes.find_one({
+            "post_id": post_id,
+            "user_id": user_id
+        })
+        post["is_liked_by_user"] = bool(is_liked)
+        
+        # Check if user is following the post author
+        if post["user_id"] != user_id:
+            is_following = await db.follows.find_one({
+                "follower_id": user_id,
+                "following_id": post["user_id"]
+            })
+            post["is_followed_by_user"] = bool(is_following)
+        else:
+            post["is_followed_by_user"] = False
+        
+        # Check if user bookmarked this post
+        is_bookmarked = await db.bookmarks.find_one({
+            "post_id": post_id,
+            "user_id": user_id
+        })
+        post["is_bookmarked"] = bool(is_bookmarked)
+        
         posts.append(post)
 
     return posts
@@ -109,3 +140,43 @@ async def delete_post(post_id: str, user=Depends(get_current_user)):
     await db.likes.delete_many({"post_id": post_id})
 
     return {"message": "Post deleted successfully"}
+
+
+@router.get("/related/{entity_text}")
+async def get_related_posts(entity_text: str, user=Depends(get_current_user)):
+    """
+    Get posts that mention a specific entity (NER-based related posts).
+    This is a core NER feature - find all posts containing a given entity.
+    """
+    user_id = user["user_id"]
+    
+    # Query posts where entities array contains matching entity text
+    cursor = (
+        db.posts
+        .find({"entities.text": {"$regex": f"^{entity_text}$", "$options": "i"}})
+        .sort("created_at", -1)
+        .limit(50)
+    )
+    
+    posts = []
+    async for post in cursor:
+        post["_id"] = str(post["_id"])
+        post_id = post["_id"]
+        
+        # Enrichments
+        comment_count = await db.comments.count_documents({"post_id": post_id})
+        post["comment_count"] = comment_count
+        
+        is_liked = await db.likes.find_one({"post_id": post_id, "user_id": user_id})
+        post["is_liked_by_user"] = bool(is_liked)
+        
+        is_bookmarked = await db.bookmarks.find_one({"post_id": post_id, "user_id": user_id})
+        post["is_bookmarked"] = bool(is_bookmarked)
+        
+        posts.append(post)
+    
+    return {
+        "entity": entity_text,
+        "count": len(posts),
+        "posts": posts
+    }
