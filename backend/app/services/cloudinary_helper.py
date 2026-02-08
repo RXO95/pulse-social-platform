@@ -10,6 +10,10 @@ import cloudinary.uploader
 from fastapi import UploadFile, HTTPException
 import os
 from typing import Optional, Tuple
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure Cloudinary from environment variables
 cloudinary.config(

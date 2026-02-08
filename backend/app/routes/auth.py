@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from datetime import datetime
+from pydantic import BaseModel
 
 from app.models.user import UserCreate
 from app.services.database import db
@@ -7,6 +8,11 @@ from app.auth.hash import hash_password, verify_password
 from app.auth.jwt import create_access_token
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
 
 
 @router.post("/signup")
@@ -40,13 +46,13 @@ async def signup(user: UserCreate):
 
 
 @router.post("/login")
-async def login(email: str, password: str):
-    user = await db.users.find_one({"email": email})
+async def login(credentials: UserLogin):
+    user = await db.users.find_one({"email": credentials.email})
 
     if not user:
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
-    if not verify_password(password, user["password_hash"]):
+    if not verify_password(credentials.password, user["password_hash"]):
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
     token = create_access_token({

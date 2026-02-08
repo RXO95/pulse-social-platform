@@ -6,6 +6,7 @@ import LikeButton from "../components/LikeButton";
 import CommentButton from "../components/CommentButton";
 import BookmarkButton from "../components/BookmarkButton";
 import DarkModeToggle from "../components/DarkModeToggle";
+import Loader from "../components/Loader";
 import useIsMobile from "../hooks/useIsMobile";
 
 export default function PostDetail() {
@@ -14,6 +15,8 @@ export default function PostDetail() {
   const [post, setPost] = useState(null);
   const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   
   // --- NEW: Translation State ---
   const [translatedText, setTranslatedText] = useState(null);
@@ -27,6 +30,8 @@ export default function PostDetail() {
 
   // Fetch Post Details
   const fetchPost = async () => {
+    setIsLoading(true);
+    setLoadError(false);
     try {
       const res = await fetch(`${API}/posts/${postId}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -35,11 +40,15 @@ export default function PostDetail() {
         const data = await res.json();
         setPost(data);
       } else {
+        setLoadError(true);
         alert("Post not found");
         navigate("/feed");
       }
     } catch {
       console.error("Failed to load post");
+      setLoadError(true);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -171,7 +180,20 @@ export default function PostDetail() {
     fetchNotes();
   }, [postId]);
 
-  if (!post) return <div style={{textAlign:"center", marginTop: 50, color: t.text}}>Loading...</div>;
+  if (isLoading) return (
+    <div style={{display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: t.bg}}>
+      <Loader />
+    </div>
+  );
+
+  if (loadError || !post) return (
+    <div style={{display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: t.bg, color: t.text}}>
+      <p>Failed to load post</p>
+      <button onClick={() => navigate("/feed")} style={{marginTop: 10, padding: "10px 20px", cursor: "pointer"}}>
+        Back to Feed
+      </button>
+    </div>
+  );
 
   // --- HELPER: Context Box Component ---
   const renderContextBox = () => {

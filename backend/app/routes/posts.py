@@ -15,6 +15,11 @@ router = APIRouter(prefix="/posts", tags=["Posts"])
 # Helper function to create post document
 async def _create_post_common(content: str, user: dict, media_url: str = None, media_type: str = None):
     """Common post creation logic"""
+    
+    # Fetch current username from database (JWT may have stale username after profile update)
+    current_user = await db.users.find_one({"_id": ObjectId(user["user_id"])})
+    username = current_user["username"] if current_user else user["username"]
+    
     # 🔍 Analyze content using ML service
     try:
         analysis = await analyze_text(content)
@@ -34,7 +39,7 @@ async def _create_post_common(content: str, user: dict, media_url: str = None, m
     # ✅ Allowed post
     new_post = {
         "user_id": user["user_id"],
-        "username": user["username"],
+        "username": username,
         "content": content,
         "entities": analysis.get("entities", []),
         "risk_score": analysis.get("risk_score", 0),

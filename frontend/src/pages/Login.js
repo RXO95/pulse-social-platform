@@ -26,10 +26,11 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const res = await fetch(
-        `${API}/auth/login?email=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`,
-        { method: "POST" }
-      );
+      const res = await fetch(`${API}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
 
       if (!res.ok) {
         alert("Invalid credentials");

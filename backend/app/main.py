@@ -14,7 +14,11 @@ from app.routes.translate import router as translate_router
 from app.routes.entities import router as entities_router
 from app.routes.bookmarks import router as bookmarks_router
 
-app = FastAPI(title="Pulse Backend API")
+app = FastAPI(
+    title="Pulse Backend API",
+    docs_url="/docs",
+    openapi_url="/openapi.json"
+)
 
 # Configure CORS
 app.add_middleware(
@@ -25,19 +29,19 @@ app.add_middleware(
     allow_headers=["*"],  # Allow all headers
 )
 
-app.include_router(auth_router, prefix="/api")
-app.include_router(posts_router, prefix="/api")
-app.include_router(feed_router, prefix="/api")
-app.include_router(likes_router, prefix="/api")
-app.include_router(users_router, prefix="/api")
-app.include_router(follow_router, prefix="/api")
-app.include_router(personal_feed_router, prefix="/api")
-app.include_router(trending_router, prefix="/api")
-app.include_router(search_router, prefix="/api")
-app.include_router(comments_router, prefix="/api")
-app.include_router(translate_router, prefix="/api")
-app.include_router(entities_router, prefix="/api")
-app.include_router(bookmarks_router, prefix="/api")
+app.include_router(auth_router)
+app.include_router(posts_router)
+app.include_router(feed_router)
+app.include_router(likes_router)
+app.include_router(users_router)
+app.include_router(follow_router)
+app.include_router(personal_feed_router)
+app.include_router(trending_router)
+app.include_router(search_router)
+app.include_router(comments_router)
+app.include_router(translate_router)
+app.include_router(entities_router)
+app.include_router(bookmarks_router)
 
 @app.get("/")
 def root():

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import DarkModeToggle from "../components/DarkModeToggle";
+import Loader from "../components/Loader";
 import useIsMobile from "../hooks/useIsMobile";
 
 export default function Profile() {
@@ -17,6 +18,8 @@ export default function Profile() {
   const [editPicture, setEditPicture] = useState(null);
   const [picturePreview, setPicturePreview] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const fileInputRef = useRef(null);
   const token = localStorage.getItem("token");
   const { darkMode } = useTheme();
@@ -44,6 +47,7 @@ export default function Profile() {
 
   // Fetch Profile Info
   const fetchProfile = async () => {
+    setIsLoadingProfile(true);
     try {
       const res = await fetch(`${API}/users/${username}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -54,12 +58,15 @@ export default function Profile() {
       }
     } catch {
       console.error("Failed to load profile");
+    } finally {
+      setIsLoadingProfile(false);
     }
   };
 
   // Fetch User's Posts (Reuse existing feed endpoint filtering on client for now)
   // Ideally, create a backend endpoint: /posts/user/{username}
   const fetchUserPosts = async () => {
+    setIsLoadingPosts(true);
     try {
       const res = await fetch(`${API}/posts/`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -72,6 +79,8 @@ export default function Profile() {
       }
     } catch {
       console.error("Failed to load posts");
+    } finally {
+      setIsLoadingPosts(false);
     }
   };
 
@@ -157,7 +166,11 @@ export default function Profile() {
     fetchCurrentUser();
   }, [username]);
 
-  if (!profile) return <div style={{textAlign:"center", marginTop: 50, color: t.text}}>Loading...</div>;
+  if (isLoadingProfile || !profile) return (
+    <div style={{display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: t.bg}}>
+      <Loader />
+    </div>
+  );
 
   return (
     <div style={styles.fullScreenWrapper}>
@@ -217,7 +230,14 @@ export default function Profile() {
       {/* USER POSTS */}
       <div style={styles.feedList}>
         <h4 style={styles.sectionTitle}>Posts</h4>
-        {posts.map((p) => (
+        {isLoadingPosts ? (
+          <div style={{padding: 40, display: "flex", justifyContent: "center"}}>
+            <Loader />
+          </div>
+        ) : posts.length === 0 ? (
+          <p style={{color: t.textSecondary, textAlign: "center", padding: 20}}>No posts yet</p>
+        ) : (
+          posts.map((p) => (
           <div key={p._id} style={styles.postCard}>
             <div style={styles.postHeader}>
               <div style={styles.avatarSmall}>
@@ -246,8 +266,8 @@ export default function Profile() {
                 ))}
             </div>
           </div>
-        ))}
-        {posts.length === 0 && <p style={{color: t.textSecondary, textAlign:"center"}}>No posts yet.</p>}
+        ))
+        )}
       </div>
       </div>
 
