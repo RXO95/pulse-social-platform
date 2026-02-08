@@ -75,6 +75,9 @@ async def get_my_bookmarks(user=Depends(get_current_user)):
         
         post["_id"] = str(post["_id"])
         
+        # Ensure likes has default value
+        post["likes"] = post.get("likes", 0)
+        
         # Enrichments
         comment_count = await db.comments.count_documents({"post_id": post_id})
         post["comment_count"] = comment_count

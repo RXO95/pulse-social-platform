@@ -3,3 +3,5 @@ uvicorn
 motor
 python-dotenv
 email-validator
+cloudinary
+python-multipart

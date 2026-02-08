@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import LikeButton from "../components/LikeButton";
+import CommentButton from "../components/CommentButton";
+import BookmarkButton from "../components/BookmarkButton";
 import DarkModeToggle from "../components/DarkModeToggle";
 import useIsMobile from "../hooks/useIsMobile";
 
@@ -53,6 +55,65 @@ export default function PostDetail() {
       }
     } catch {
       console.error("Failed to load comments");
+    }
+  };
+
+  // Handle Like
+  const handleLike = async () => {
+    if (!post) return;
+    const wasLiked = post.is_liked_by_user;
+    const currentLikes = post.likes || 0;
+    
+    // Optimistic update
+    setPost(prev => ({
+      ...prev,
+      is_liked_by_user: !wasLiked,
+      likes: wasLiked ? currentLikes - 1 : currentLikes + 1
+    }));
+    
+    try {
+      const res = await fetch(`${API}/likes/${postId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPost(prev => ({
+          ...prev,
+          is_liked_by_user: data.liked,
+          likes: data.likes
+        }));
+      } else {
+        // Revert on error
+        setPost(prev => ({
+          ...prev,
+          is_liked_by_user: wasLiked,
+          likes: currentLikes
+        }));
+      }
+    } catch {
+      setPost(prev => ({
+        ...prev,
+        is_liked_by_user: wasLiked,
+        likes: currentLikes
+      }));
+    }
+  };
+
+  // Handle Bookmark
+  const handleBookmark = async () => {
+    if (!post) return;
+    try {
+      const res = await fetch(`${API}/bookmarks/${postId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPost(prev => ({ ...prev, is_bookmarked: data.bookmarked }));
+      }
+    } catch {
+      console.error("Bookmark failed");
     }
   };
 
@@ -181,6 +242,17 @@ export default function PostDetail() {
           {showTranslation ? translatedText : post.content}
         </p>
 
+        {/* --- POST MEDIA --- */}
+        {post.media_url && (
+          <div style={styles.mediaContainer}>
+            {post.media_type === "video" ? (
+              <video src={post.media_url} controls style={styles.media} />
+            ) : (
+              <img src={post.media_url} alt="Post media" style={styles.media} />
+            )}
+          </div>
+        )}
+
         {/* --- NEW: Translate Button --- */}
         <div 
            style={styles.translateBtn} 
@@ -200,6 +272,23 @@ export default function PostDetail() {
 
         {/* --- PULSE CONTEXT BOX --- */}
         {renderContextBox()}
+
+        {/* ACTION BUTTONS */}
+        <div style={styles.actionSection}>
+          <LikeButton 
+            isLiked={post.is_liked_by_user} 
+            count={post.likes || 0}
+            onLike={handleLike}
+          />
+          <CommentButton 
+            onClick={() => document.querySelector('textarea')?.focus()}
+            count={notes.length}
+          />
+          <BookmarkButton 
+            isBookmarked={post.is_bookmarked}
+            onToggle={handleBookmark}
+          />
+        </div>
 
         <div style={{marginTop: 15, paddingTop: 10, borderTop: `1px solid ${t.border}`}}>
            <small style={{color: t.textSecondary}}>{new Date(post.created_at).toLocaleString()}</small>
@@ -249,6 +338,10 @@ function getStyles(t, m) { return {
   header: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" },
   avatar: { width: m ? "40px" : "48px", height: m ? "40px" : "48px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: m ? "16px" : "20px", color: "#1a1a1a", flexShrink: 0 },
   content: { fontSize: m ? "17px" : "23px", lineHeight: "1.35", margin: "8px 0 12px", color: t.text, wordBreak: "break-word" },
+  
+  // Media styles
+  mediaContainer: { marginTop: "12px", marginBottom: "12px", borderRadius: "16px", overflow: "hidden", maxHeight: m ? "350px" : "500px", border: `1px solid ${t.border}` },
+  media: { width: "100%", maxHeight: m ? "350px" : "500px", objectFit: "cover", display: "block" },
   
   translateBtn: {
     color: t.accentBlue,
@@ -313,6 +406,15 @@ function getStyles(t, m) { return {
     fontSize: m ? "13px" : "14px",
     display: "block",
     wordBreak: "break-word"
+  },
+
+  actionSection: {
+    display: "flex",
+    alignItems: "center",
+    gap: m ? "24px" : "32px",
+    padding: "16px 4px",
+    marginTop: "16px",
+    borderTop: `1px solid ${t.border}`
   },
 
   notesSection: { marginTop: "0", borderTop: `1px solid ${t.border}`, padding: m ? "16px" : "20px" },

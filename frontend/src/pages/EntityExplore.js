@@ -226,6 +226,17 @@ export default function EntityExplore() {
                 {p.content}
               </p>
 
+              {/* Post Media */}
+              {p.media_url && (
+                <div style={styles.mediaContainer} onClick={() => navigate(`/post/${p._id}`)}>
+                  {p.media_type === "video" ? (
+                    <video src={p.media_url} style={styles.media} />
+                  ) : (
+                    <img src={p.media_url} alt="Post media" style={styles.media} />
+                  )}
+                </div>
+              )}
+
               <div style={styles.entityContainer}>
                 {p.entities?.map((e, idx) => (
                   <span 
@@ -300,6 +311,11 @@ function getStyles(t, m) { return {
   username: { fontSize: "15px", fontWeight: "700", color: t.text, cursor: "pointer" },
   timestamp: { fontSize: "14px", color: t.textSecondary },
   postContent: { fontSize: "15px", lineHeight: "1.5", margin: "4px 0 8px 0", color: t.text, wordBreak: "break-word", cursor: "pointer" },
+  
+  // Media styles
+  mediaContainer: { marginTop: "12px", marginBottom: "12px", borderRadius: "16px", overflow: "hidden", maxHeight: m ? "250px" : "400px", border: `1px solid ${t.border}`, cursor: "pointer" },
+  media: { width: "100%", maxHeight: m ? "250px" : "400px", objectFit: "cover", display: "block" },
+  
   entityContainer: { display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" },
   tag: { backgroundColor: t.tagBg, color: t.tagText, padding: "3px 10px", borderRadius: "9999px", fontSize: "13px", fontWeight: "500" },
   actionSection: { display: "flex", alignItems: "center", gap: m ? "16px" : "24px", marginTop: "8px", paddingTop: "4px" }

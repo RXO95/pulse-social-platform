@@ -31,6 +31,21 @@ async def personal_feed(user=Depends(get_current_user)):
     posts = []
     async for post in posts_cursor:
         post["_id"] = str(post["_id"])
+        post_id = post["_id"]
+        
+        # Ensure likes has default value
+        post["likes"] = post.get("likes", 0)
+        
+        # Add enrichments
+        comment_count = await db.comments.count_documents({"post_id": post_id})
+        post["comment_count"] = comment_count
+        
+        is_liked = await db.likes.find_one({"post_id": post_id, "user_id": user_id})
+        post["is_liked_by_user"] = bool(is_liked)
+        
+        is_bookmarked = await db.bookmarks.find_one({"post_id": post_id, "user_id": user_id})
+        post["is_bookmarked"] = bool(is_bookmarked)
+        
         posts.append(post)
 
     return posts

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom"; 
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
@@ -35,6 +35,12 @@ export default function Feed() {
   const [isLoading, setIsLoading] = useState(true);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [isPosting, setIsPosting] = useState(false);
+  
+  // Media upload state
+  const [mediaFile, setMediaFile] = useState(null);
+  const [mediaPreview, setMediaPreview] = useState(null);
+  const [mediaType, setMediaType] = useState(null);
+  const mediaInputRef = useRef(null);
 
   const { logout } = useAuth();
   const navigate = useNavigate(); 
@@ -120,6 +126,20 @@ export default function Feed() {
   };
 
   const handleLike = async (postId) => {
+    // Find the post to get current state
+    const post = posts.find(p => p._id === postId);
+    if (!post) return;
+    
+    // Optimistic UI update
+    const wasLiked = post.is_liked_by_user;
+    const newLikeCount = wasLiked ? post.likes - 1 : post.likes + 1;
+    
+    setPosts(posts.map(p => 
+      p._id === postId 
+        ? { ...p, is_liked_by_user: !wasLiked, likes: newLikeCount } 
+        : p
+    ));
+    
     try {
       const res = await fetch(`${API}/likes/${postId}`, {
         method: "POST",
@@ -127,18 +147,39 @@ export default function Feed() {
       });
       
       if (res.ok) {
-        // Optimistic UI update or refetch
-        fetchPosts(); 
-      } else {
         const data = await res.json();
-        console.log(data.detail || "Already liked");
+        // Update with actual server values
+        setPosts(prev => prev.map(p => 
+          p._id === postId 
+            ? { ...p, is_liked_by_user: data.liked, likes: data.likes } 
+            : p
+        ));
+      } else {
+        // Revert on error
+        setPosts(prev => prev.map(p => 
+          p._id === postId 
+            ? { ...p, is_liked_by_user: wasLiked, likes: post.likes } 
+            : p
+        ));
       }
     } catch {
-      alert("Could not like post");
+      // Revert on error
+      setPosts(prev => prev.map(p => 
+        p._id === postId 
+          ? { ...p, is_liked_by_user: wasLiked, likes: post.likes } 
+          : p
+      ));
     }
   };
 
   const handleFollowToggle = async (postAuthorId, isFollowing) => {
+    // Optimistic UI update - update all posts by this author
+    setPosts(posts.map(p => 
+      p.user_id === postAuthorId 
+        ? { ...p, is_followed_by_user: !isFollowing } 
+        : p
+    ));
+    
     try {
       const method = isFollowing ? "DELETE" : "POST";
       const res = await fetch(`${API}/follow/${postAuthorId}`, {
@@ -146,13 +187,23 @@ export default function Feed() {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (res.ok) {
-        fetchPosts(); 
-      } else {
+      if (!res.ok) {
+        // Revert on error
+        setPosts(prev => prev.map(p => 
+          p.user_id === postAuthorId 
+            ? { ...p, is_followed_by_user: isFollowing } 
+            : p
+        ));
         const data = await res.json();
         alert(data.message || "Action failed");
       }
     } catch {
+      // Revert on error
+      setPosts(prev => prev.map(p => 
+        p.user_id === postAuthorId 
+          ? { ...p, is_followed_by_user: isFollowing } 
+          : p
+      ));
       alert("Network error while updating follow status");
     }
   };
@@ -258,24 +309,65 @@ export default function Feed() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, [openMenuId]);
 
+  // Handle media file selection
+  const handleMediaSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setMediaFile(file);
+      setMediaPreview(URL.createObjectURL(file));
+      setMediaType(file.type.startsWith("video/") ? "video" : "image");
+    }
+  };
+
+  // Clear media selection
+  const clearMedia = () => {
+    setMediaFile(null);
+    setMediaPreview(null);
+    setMediaType(null);
+    if (mediaInputRef.current) {
+      mediaInputRef.current.value = "";
+    }
+  };
+
   const createPost = async () => {
-    if (!content.trim()) return;
+    if (!content.trim() && !mediaFile) return;
     try {
       setIsPosting(true);
-      const res = await fetch(`${API}/posts/`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ content })
-      });
+      
+      let res;
+      
+      if (mediaFile) {
+        // Use FormData with /posts/with-media endpoint for media posts
+        const formData = new FormData();
+        formData.append("content", content.trim() || " ");
+        formData.append("media", mediaFile);
+        
+        res = await fetch(`${API}/posts/with-media`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`
+          },
+          body: formData
+        });
+      } else {
+        // Use JSON for text-only posts (more compatible)
+        res = await fetch(`${API}/posts/`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ content: content.trim() })
+        });
+      }
+      
       if (!res.ok) {
         const data = await res.json();
-        alert(data.message || "Post blocked");
+        alert(data.detail?.message || data.detail || "Post blocked");
         return;
       }
       setContent("");
+      clearMedia();
       fetchPosts();
       fetchTrending();
     } catch {
@@ -344,8 +436,44 @@ export default function Feed() {
                   onChange={(e) => setContent(e.target.value)}
                   style={styles.textarea}
                 />
+                
+                {/* Media Preview */}
+                {mediaPreview && (
+                  <div style={styles.mediaPreviewContainer}>
+                    <button onClick={clearMedia} style={styles.removeMediaBtn}>✕</button>
+                    {mediaType === "video" ? (
+                      <video src={mediaPreview} style={styles.mediaPreview} controls />
+                    ) : (
+                      <img src={mediaPreview} alt="Preview" style={styles.mediaPreview} />
+                    )}
+                  </div>
+                )}
+                
                 <div style={styles.buttonContainer}>
-                  <button onClick={createPost} style={{...styles.postButton, opacity: content.trim() ? 1 : 0.5}}>Post</button>
+                  {/* Media Upload Button */}
+                  <input 
+                    type="file" 
+                    ref={mediaInputRef} 
+                    accept="image/*,video/*" 
+                    onChange={handleMediaSelect}
+                    style={{display: "none"}}
+                  />
+                  <button 
+                    onClick={() => mediaInputRef.current?.click()} 
+                    style={styles.mediaBtn}
+                    title="Add image or video"
+                  >
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                      <path d="M3 5.5C3 4.119 4.119 3 5.5 3h13C19.881 3 21 4.119 21 5.5v13c0 1.381-1.119 2.5-2.5 2.5h-13C4.119 21 3 19.881 3 18.5v-13zM5.5 5c-.276 0-.5.224-.5.5v9.086l3-3 3 3 5-5 3 3V5.5c0-.276-.224-.5-.5-.5h-13zM19 15.414l-3-3-5 5-3-3-3 3V18.5c0 .276.224.5.5.5h13c.276 0 .5-.224.5-.5v-3.086zM9.75 7C8.784 7 8 7.784 8 8.75s.784 1.75 1.75 1.75 1.75-.784 1.75-1.75S10.716 7 9.75 7z"/>
+                    </svg>
+                  </button>
+                  <button 
+                    onClick={createPost} 
+                    style={{...styles.postButton, opacity: (content.trim() || mediaFile) ? 1 : 0.5}}
+                    disabled={!content.trim() && !mediaFile}
+                  >
+                    {isPosting ? "Posting..." : "Post"}
+                  </button>
                 </div>
               </div>
             </div>
@@ -428,6 +556,17 @@ export default function Feed() {
                     <p style={styles.postContent}>
                       {p.showTranslation ? p.translatedText : p.content}
                     </p>
+
+                    {/* --- POST MEDIA --- */}
+                    {p.media_url && (
+                      <div style={styles.postMediaContainer} onClick={e => e.stopPropagation()}>
+                        {p.media_type === "video" ? (
+                          <video src={p.media_url} controls style={styles.postMedia} />
+                        ) : (
+                          <img src={p.media_url} alt="Post media" style={styles.postMedia} />
+                        )}
+                      </div>
+                    )}
 
                     {/* --- TRANSLATE BUTTON --- */}
                     <div 
@@ -622,7 +761,18 @@ function getStyles(t, m) { return {
   composeAvatar: { width: "40px", height: "40px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", color: "#1a1a1a", fontSize: "16px", flexShrink: 0 },
   card: { backgroundColor: t.cardBg, padding: m ? "12px" : "16px", borderBottom: `1px solid ${t.border}`, transition: "background-color 0.3s" },
   textarea: { width: "100%", minHeight: m ? "52px" : "56px", border: "none", outline: "none", fontSize: m ? "18px" : "20px", resize: "none", backgroundColor: "transparent", color: t.text, lineHeight: "1.4", padding: "8px 0" },
-  buttonContainer: { display: "flex", justifyContent: "flex-end", borderTop: `1px solid ${t.border}`, paddingTop: "12px", marginTop: "8px" },
+  buttonContainer: { display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: `1px solid ${t.border}`, paddingTop: "12px", marginTop: "8px" },
+  
+  // Media upload styles
+  mediaBtn: { background: "none", border: "none", color: t.accentBlue, cursor: "pointer", padding: "8px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", transition: "background-color 0.2s" },
+  mediaPreviewContainer: { position: "relative", marginTop: "12px", borderRadius: "16px", overflow: "hidden", maxHeight: "300px", border: `1px solid ${t.border}` },
+  mediaPreview: { width: "100%", maxHeight: "300px", objectFit: "cover", display: "block" },
+  removeMediaBtn: { position: "absolute", top: "8px", right: "8px", background: "rgba(0,0,0,0.75)", color: "#fff", border: "none", borderRadius: "50%", width: "32px", height: "32px", cursor: "pointer", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1 },
+  
+  // Post media display styles
+  postMediaContainer: { marginTop: "12px", borderRadius: "16px", overflow: "hidden", maxHeight: m ? "300px" : "500px", border: `1px solid ${t.border}` },
+  postMedia: { width: "100%", maxHeight: m ? "300px" : "500px", objectFit: "cover", display: "block" },
+  
   postButton: { backgroundColor: t.accentBlue, color: "#fff", border: "none", padding: m ? "8px 20px" : "10px 24px", borderRadius: "9999px", fontWeight: "700", fontSize: "15px", cursor: "pointer", transition: "all 0.2s" },
   feedList: { display: "flex", flexDirection: "column", gap: "0", paddingBottom: "100px" },
   postCard: { backgroundColor: t.cardBg, padding: m ? "12px 12px 4px" : "16px 16px 4px", borderBottom: `1px solid ${t.border}`, transition: "background-color 0.15s" },

@@ -138,6 +138,9 @@ async def get_entity_profile(entity_text: str, user=Depends(get_current_user)):
             if ent["text"].lower() != entity_text.lower():
                 co_occurring[(ent["text"], ent["label"])] += 1
         
+        # Ensure likes has default value
+        post["likes"] = post.get("likes", 0)
+        
         # Enrichments
         comment_count = await db.comments.count_documents({"post_id": post_id})
         post["comment_count"] = comment_count
