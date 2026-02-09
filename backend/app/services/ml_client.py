@@ -79,6 +79,69 @@ VIOLENT_KEYWORDS = [
 
 SENSITIVE_LABELS = {"PER", "ORG", "GPE", "LOC"}
 
+
+# --- HASHTAG & MENTION EXTRACTION ---
+def normalize_hashtag(hashtag: str) -> str:
+    """
+    Convert hashtag to readable text.
+    #GameOfThrones -> Game Of Thrones
+    #game_of_thrones -> game of thrones
+    #gameofthrones -> gameofthrones (will match fuzzy later)
+    """
+    # Remove the # symbol
+    tag = hashtag.lstrip('#')
+    
+    # Handle underscores
+    if '_' in tag:
+        return tag.replace('_', ' ')
+    
+    # Handle camelCase: insert space before uppercase letters
+    result = re.sub(r'([a-z])([A-Z])', r'\1 \2', tag)
+    
+    # Handle consecutive uppercase followed by lowercase (e.g., XMLParser -> XML Parser)
+    result = re.sub(r'([A-Z]+)([A-Z][a-z])', r'\1 \2', result)
+    
+    return result
+
+
+def extract_hashtags_and_mentions(text: str):
+    """Extract hashtags and @mentions from text."""
+    hashtags = re.findall(r'#(\w+)', text)
+    mentions = re.findall(r'@(\w+)', text)
+    return hashtags, mentions
+
+
+def find_matching_entity(normalized_tag: str, entities: list, known_entities: dict):
+    """
+    Try to match a normalized hashtag with existing entities.
+    Returns (matched_text, label, identified_as) or None.
+    """
+    tag_lower = normalized_tag.lower().replace(' ', '')
+    
+    # Check against KNOWN_ENTITIES dictionary
+    for key, (english_name, label) in known_entities.items():
+        key_normalized = key.lower().replace(' ', '')
+        english_normalized = english_name.lower().replace(' ', '')
+        
+        if tag_lower == key_normalized or tag_lower == english_normalized:
+            return (normalized_tag, label, english_name)
+    
+    # Check against ML-detected entities (fuzzy match)
+    for ent in entities:
+        ent_text_normalized = ent["text"].lower().replace(' ', '')
+        if tag_lower == ent_text_normalized:
+            return (ent["text"], ent["label"], ent.get("identified_as"))
+    
+    # Check by removing common suffixes/variations
+    # e.g., "gameofthrones" should match "Game of Thrones"
+    for ent in entities:
+        ent_clean = ent["text"].lower().replace(' ', '').replace('the', '').replace('of', '')
+        tag_clean = tag_lower.replace('the', '').replace('of', '')
+        if tag_clean == ent_clean and len(tag_clean) > 3:
+            return (ent["text"], ent["label"], ent.get("identified_as"))
+    
+    return None
+
 # --- MULTILINGUAL DICTIONARY ---
 KNOWN_ENTITIES = {
     # Hinglish / Slang
@@ -163,76 +226,67 @@ async def generate_context(entities, text=""):
     if not entities:
         return context
 
-    # 1. Select the Best Subject for Search
-    # Priority: Dictionary Matches (confidence=1.0) -> People -> Locations
-    best_subject = None
-    best_entity = None
-    
-    # Check for Dictionary match first
+    # 1. Generate disambiguation for ALL entities
+    processed_entities = []
     for ent in entities:
-        if ent.get("confidence") == 1.0:
-            best_subject = ent["text"]
-            best_entity = ent
-            break
-    
-    # If no dictionary match, fallback to ML entities
-    if not best_subject:
-        people = [e for e in entities if e["label"] == "PER"]
-        locations = [e for e in entities if e["label"] in ["GPE", "LOC"]]
-        best_entity = people[0] if people else (locations[0] if locations else None)
-        if best_entity:
-            best_subject = best_entity["text"]
-
-    if not best_subject:
-        return context
-
-    # 1b. Check if entity already has "identified_as" (from dictionary)
-    # Otherwise, transliterate non-Latin entities to English for better search
-    if best_entity and best_entity.get("identified_as"):
-        english_subject = best_entity["identified_as"]
-    else:
-        english_subject = await transliterate_to_english(best_subject)
-    
-    # Build English names for all entities
-    english_names = []
-    for ent in entities:
+        entity_text = ent["text"]
+        
+        # Get English name for search
         if ent.get("identified_as"):
-            english_names.append(ent["identified_as"])
+            english_name = ent["identified_as"]
         else:
-            en_name = await transliterate_to_english(ent["text"])
-            english_names.append(en_name)
-
-    # 2. Fetch Data (Independent Calls)
-    # Wikipedia — try English name first, then original
-    wiki_data = await fetch_wikipedia_summary(english_subject)
-    if not wiki_data and english_subject != best_subject:
-        wiki_data = await fetch_wikipedia_summary(best_subject)
-    
-    if wiki_data:
-        context["disambiguation"].append({
-            "entity": best_subject,
-            "identified_as": wiki_data["title"],
-            "description": wiki_data["description"]
+            english_name = await transliterate_to_english(entity_text)
+        
+        processed_entities.append({
+            "original": entity_text,
+            "english": english_name,
+            "label": ent.get("label", "MISC")
         })
-        context["is_generated"] = True
+        
+        # Try to fetch Wikipedia data for this entity
+        wiki_data = await fetch_wikipedia_summary(english_name)
+        if not wiki_data and english_name != entity_text:
+            wiki_data = await fetch_wikipedia_summary(entity_text)
+        
+        if wiki_data:
+            context["disambiguation"].append({
+                "entity": entity_text,
+                "identified_as": wiki_data["title"],
+                "description": wiki_data["description"]
+            })
+            context["is_generated"] = True
 
-    # 3. Build a specific news query from multiple entities for relevance
-    # Use English names for the search query
+    # 2. Build news query from multiple entities
+    # Prioritize: People > Organizations > Locations
+    english_names = [e["english"] for e in processed_entities]
+    
+    # Sort entities by priority for news query
+    people = [e for e in processed_entities if e["label"] == "PER"]
+    orgs = [e for e in processed_entities if e["label"] == "ORG"]
+    locations = [e for e in processed_entities if e["label"] in ["GPE", "LOC"]]
+    others = [e for e in processed_entities if e["label"] not in ["PER", "ORG", "GPE", "LOC"]]
+    
+    priority_order = people + orgs + locations + others
+    
+    # Build query with top 3 entities
     seen = set()
     query_parts = []
-    for name in english_names:
-        if name not in seen and len(query_parts) < 3:
-            seen.add(name)
-            query_parts.append(name)
-
-    news_query = " ".join(query_parts) if len(query_parts) > 1 else english_subject
+    for ent in priority_order:
+        if ent["english"] not in seen and len(query_parts) < 3:
+            seen.add(ent["english"])
+            query_parts.append(ent["english"])
+    
+    news_query = " ".join(query_parts) if query_parts else (english_names[0] if english_names else "")
+    
+    if not news_query:
+        return context
     
     # Combine both original + English names for relevance matching
-    all_names = set(e["text"] for e in entities) | set(english_names)
+    all_names = set(e["original"] for e in processed_entities) | set(english_names)
 
     news_data = await fetch_google_news(news_query, entity_names=list(all_names))
 
-    # 4. Validate news relevance — headline must mention at least one entity (original or English)
+    # 3. Validate news relevance — headline must mention at least one entity
     if news_data:
         headline_lower = news_data["headline"].lower()
         all_names_lower = {name.lower() for name in all_names}
@@ -242,12 +296,13 @@ async def generate_context(entities, text=""):
             context["news"] = news_data
             context["is_generated"] = True
         else:
-            # Retry with just the English subject
-            fallback_data = await fetch_google_news(english_subject, entity_names=list(all_names))
-            if fallback_data:
-                fb_headline = fallback_data["headline"].lower()
-                if any(name in fb_headline for name in all_names_lower):
-                    context["news"] = fallback_data
+            # Retry with just the first entity
+            if english_names:
+                fallback_data = await fetch_google_news(english_names[0], entity_names=list(all_names))
+                if fallback_data:
+                    fb_headline = fallback_data["headline"].lower()
+                    if any(name in fb_headline for name in all_names_lower):
+                        context["news"] = fallback_data
                     context["is_generated"] = True
 
     return context
@@ -291,10 +346,69 @@ async def analyze_text(text: str):
                 })
                 detected_keys.add(english_name)
 
-    # 3. Merge: Put Dictionary entities FIRST so they are prioritized
-    final_entities = dict_entities + ml_entities
+    # 3. Extract and process hashtags & mentions
+    hashtags, mentions = extract_hashtags_and_mentions(text)
+    hashtag_mention_entities = []
+    
+    # Combined entities so far for matching
+    all_entities_so_far = dict_entities + ml_entities
+    detected_normalized = {ent["text"].lower().replace(' ', '') for ent in all_entities_so_far}
+    
+    # Process hashtags
+    for tag in hashtags:
+        normalized = normalize_hashtag(tag)
+        normalized_key = normalized.lower().replace(' ', '')
+        
+        # Skip if already detected
+        if normalized_key in detected_normalized:
+            continue
+        
+        # Try to find a matching entity
+        match = find_matching_entity(normalized, all_entities_so_far, KNOWN_ENTITIES)
+        
+        if match:
+            matched_text, label, identified_as = match
+            # Use the hashtag as display but link to the matched entity
+            hashtag_mention_entities.append({
+                "text": f"#{tag}",
+                "label": label,
+                "confidence": 0.9,
+                "source": "hashtag",
+                "identified_as": identified_as or matched_text
+            })
+        else:
+            # New entity from hashtag - default to ORG/MISC based on common patterns
+            # Proper nouns are often ORG (brands, shows, etc.)
+            hashtag_mention_entities.append({
+                "text": f"#{tag}",
+                "label": "ORG",  # Default: hashtags often refer to brands/shows/events
+                "confidence": 0.7,
+                "source": "hashtag",
+                "identified_as": normalized.title() if normalized != tag else None
+            })
+        
+        detected_normalized.add(normalized_key)
+    
+    # Process @mentions as PER entities
+    for mention in mentions:
+        mention_lower = mention.lower()
+        
+        # Skip if already detected as an entity
+        if mention_lower in detected_normalized:
+            continue
+        
+        hashtag_mention_entities.append({
+            "text": f"@{mention}",
+            "label": "PER",
+            "confidence": 0.9,
+            "source": "mention"
+        })
+        detected_normalized.add(mention_lower)
 
-    # 4. Risk Logic
+    # 4. Merge: Dictionary first, then hashtags/mentions, then ML entities
+    final_entities = dict_entities + hashtag_mention_entities + ml_entities
+
+    # 5. Risk Logic
     violent = any(word in text_lower for word in VIOLENT_KEYWORDS)
     contains_sensitive = any(ent.get("label") in SENSITIVE_LABELS for ent in final_entities)
 
@@ -306,7 +420,7 @@ async def analyze_text(text: str):
     elif contains_sensitive:
         risk_score = 0.4
 
-    # 5. Generate Context
+    # 6. Generate Context
     context_data = await generate_context(final_entities, text)
 
     return {

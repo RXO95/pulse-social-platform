@@ -6,7 +6,8 @@ import LikeButton from "../components/LikeButton";
 import CommentButton from "../components/CommentButton";
 import BookmarkButton from "../components/BookmarkButton";
 import DarkModeToggle from "../components/DarkModeToggle";
-import Loader from "../components/Loader";
+import BottomNav from "../components/BottomNav";
+import PostLoader from "../components/PostLoader";
 import useIsMobile from "../hooks/useIsMobile";
 
 function timeAgo(dateString) {
@@ -28,6 +29,7 @@ export default function Bookmarks() {
   const navigate = useNavigate();
   const [bookmarks, setBookmarks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
   const token = localStorage.getItem("token");
   const { darkMode } = useTheme();
   const t = getTheme(darkMode);
@@ -80,8 +82,20 @@ export default function Bookmarks() {
     }
   };
 
+  const fetchCurrentUser = async () => {
+    try {
+      const res = await fetch(`${API}/users/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setCurrentUser(await res.json());
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     fetchBookmarks();
+    fetchCurrentUser();
   }, []);
 
   return (
@@ -96,10 +110,18 @@ export default function Bookmarks() {
 
       <div style={styles.scrollArea}>
         {isLoading ? (
-          <div style={{padding: 40}}><Loader /></div>
+          <>
+            <PostLoader />
+            <PostLoader />
+            <PostLoader />
+          </>
         ) : bookmarks.length === 0 ? (
           <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>🔖</div>
+            <div style={styles.emptyIcon}>
+              <svg viewBox="0 0 24 24" width="48" height="48" fill={t.textSecondary}>
+                <path d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5z"/>
+              </svg>
+            </div>
             <h3 style={styles.emptyTitle}>No bookmarks yet</h3>
             <p style={styles.emptyText}>Save posts to view them here later</p>
           </div>
@@ -111,7 +133,13 @@ export default function Bookmarks() {
             {bookmarks.map((p) => (
               <div key={p._id} style={styles.postCard}>
                 <div style={styles.postHeader}>
-                  <div style={styles.avatar}>{p.username?.charAt(0).toUpperCase()}</div>
+                  <div style={styles.avatar}>
+                    {p.profile_pic_url ? (
+                      <img src={p.profile_pic_url} alt="" style={{width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover"}} />
+                    ) : (
+                      p.username?.charAt(0).toUpperCase()
+                    )}
+                  </div>
                   <div style={styles.postMeta}>
                     <strong 
                       style={styles.username}
@@ -173,6 +201,7 @@ export default function Bookmarks() {
           </div>
         )}
       </div>
+      {mobile && <BottomNav currentUser={currentUser} />}
     </div>
   );
 }
@@ -182,10 +211,10 @@ function getStyles(t, m) { return {
   navBar: { height: "53px", backgroundColor: t.headerBg, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", transition: "background-color 0.3s" },
   navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
   backButton: { background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: t.accentBlue, fontWeight: "600", flexShrink: 0 },
-  scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
+  scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", paddingBottom: m ? "70px" : "0", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
 
   emptyState: { textAlign: "center", padding: "60px 20px" },
-  emptyIcon: { fontSize: "48px", marginBottom: "16px" },
+  emptyIcon: { marginBottom: "16px" },
   emptyTitle: { fontSize: "20px", fontWeight: "700", color: t.text, margin: "0 0 8px 0" },
   emptyText: { color: t.textSecondary, fontSize: "15px" },
 

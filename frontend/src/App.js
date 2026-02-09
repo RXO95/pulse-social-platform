@@ -8,6 +8,8 @@ import Profile from "./pages/Profile";
 import PostDetail from "./pages/PostDetail";
 import EntityExplore from "./pages/EntityExplore";
 import Bookmarks from "./pages/Bookmarks";
+import Trending from "./pages/Trending";
+import FollowList from "./pages/FollowList";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
@@ -67,6 +69,26 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Bookmarks />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Trending Route */}
+          <Route
+            path="/trending"
+            element={
+              <ProtectedRoute>
+                <Trending />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Followers/Following Route */}
+          <Route
+            path="/profile/:username/:type"
+            element={
+              <ProtectedRoute>
+                <FollowList />
               </ProtectedRoute>
             }
           />

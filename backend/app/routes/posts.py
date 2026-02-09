@@ -6,7 +6,7 @@ from typing import Optional
 from app.models.post import PostCreate
 from app.services.database import db
 from app.auth.dependency import get_current_user
-from app.services.ml_client import analyze_text
+from app.services.ml_client import analyze_text, generate_context
 from app.services.cloudinary_helper import upload_to_cloudinary
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
@@ -120,6 +120,10 @@ async def get_posts(user=Depends(get_current_user)):
         # Ensure likes field has a default value
         post["likes"] = post.get("likes", 0)
         
+        # Fetch author's profile picture
+        author = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        post["profile_pic_url"] = author.get("profile_pic_url") if author else None
+        
         # Add comment count
         comment_count = await db.comments.count_documents({"post_id": post_id})
         post["comment_count"] = comment_count
@@ -171,6 +175,10 @@ async def get_post_by_id(post_id: str, user=Depends(get_current_user)):
     
     # 5. Ensure likes has default value
     post["likes"] = post.get("likes", 0)
+    
+    # 5.5 Fetch author's profile picture
+    author = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+    post["profile_pic_url"] = author.get("profile_pic_url") if author else None
     
     # 6. Add enrichments for current user
     user_id = user["user_id"]
@@ -239,6 +247,10 @@ async def get_related_posts(entity_text: str, user=Depends(get_current_user)):
         # Ensure likes has default value
         post["likes"] = post.get("likes", 0)
         
+        # Fetch author's profile picture
+        author = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        post["profile_pic_url"] = author.get("profile_pic_url") if author else None
+        
         # Enrichments
         comment_count = await db.comments.count_documents({"post_id": post_id})
         post["comment_count"] = comment_count
@@ -256,3 +268,39 @@ async def get_related_posts(entity_text: str, user=Depends(get_current_user)):
         "count": len(posts),
         "posts": posts
     }
+
+
+@router.post("/{post_id}/regenerate-context")
+async def regenerate_post_context(post_id: str, user=Depends(get_current_user)):
+    """
+    Regenerate the Pulse Context for a post.
+    This re-fetches Wikipedia and news data for the post's entities.
+    """
+    if not ObjectId.is_valid(post_id):
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+    
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    entities = post.get("entities", [])
+    content = post.get("content", "")
+    
+    if not entities:
+        raise HTTPException(status_code=400, detail="No entities found in post")
+    
+    try:
+        new_context = await generate_context(entities, content)
+        
+        # Update the post with new context
+        await db.posts.update_one(
+            {"_id": ObjectId(post_id)},
+            {"$set": {"context_data": new_context}}
+        )
+        
+        return {
+            "message": "Context regenerated successfully",
+            "context_data": new_context
+        }
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Failed to regenerate context: {str(e)}")

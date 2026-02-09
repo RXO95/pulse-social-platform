@@ -36,6 +36,10 @@ async def personal_feed(user=Depends(get_current_user)):
         # Ensure likes has default value
         post["likes"] = post.get("likes", 0)
         
+        # Fetch author's profile picture
+        author = await db.users.find_one({"_id": ObjectId(post["user_id"])})
+        post["profile_pic_url"] = author.get("profile_pic_url") if author else None
+        
         # Add enrichments
         comment_count = await db.comments.count_documents({"post_id": post_id})
         post["comment_count"] = comment_count

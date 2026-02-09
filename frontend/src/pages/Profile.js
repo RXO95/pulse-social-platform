@@ -3,7 +3,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import DarkModeToggle from "../components/DarkModeToggle";
+import BottomNav from "../components/BottomNav";
 import Loader from "../components/Loader";
+import PostLoader from "../components/PostLoader";
 import useIsMobile from "../hooks/useIsMobile";
 
 export default function Profile() {
@@ -221,8 +223,18 @@ export default function Profile() {
 
           <div style={styles.statsRow}>
             <span style={styles.stat}><strong>{profile.stats.posts}</strong> Posts</span>
-            <span style={styles.stat}><strong>{profile.stats.followers}</strong> Followers</span>
-            <span style={styles.stat}><strong>{profile.stats.following}</strong> Following</span>
+            <span 
+              style={{...styles.stat, cursor: "pointer"}}
+              onClick={() => navigate(`/profile/${profile.username}/followers`)}
+            >
+              <strong>{profile.stats.followers}</strong> Followers
+            </span>
+            <span 
+              style={{...styles.stat, cursor: "pointer"}}
+              onClick={() => navigate(`/profile/${profile.username}/following`)}
+            >
+              <strong>{profile.stats.following}</strong> Following
+            </span>
           </div>
         </div>
       </div>
@@ -231,9 +243,10 @@ export default function Profile() {
       <div style={styles.feedList}>
         <h4 style={styles.sectionTitle}>Posts</h4>
         {isLoadingPosts ? (
-          <div style={{padding: 40, display: "flex", justifyContent: "center"}}>
-            <Loader />
-          </div>
+          <>
+            <PostLoader />
+            <PostLoader />
+          </>
         ) : posts.length === 0 ? (
           <p style={{color: t.textSecondary, textAlign: "center", padding: 20}}>No posts yet</p>
         ) : (
@@ -336,6 +349,7 @@ export default function Profile() {
           </div>
         </div>
       )}
+      {mobile && <BottomNav currentUser={currentUser} />}
     </div>
   );
 }
@@ -345,7 +359,7 @@ function getStyles(t, m) { return {
   navBar: { height: "53px", backgroundColor: t.headerBg, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", transition: "background-color 0.3s" },
   navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
   backButton: { background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: t.accentBlue, fontWeight: "600", flexShrink: 0 },
-  scrollArea: { flex: 1, overflowY: "auto" },
+  scrollArea: { flex: 1, overflowY: "auto", paddingBottom: m ? "70px" : "0" },
   
   profileHeader: { borderBottom: `1px solid ${t.border}`, paddingBottom: "20px", maxWidth: "600px", margin: "0 auto", width: "100%", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
   coverImage: { height: m ? "130px" : "200px", background: t.coverGradient },

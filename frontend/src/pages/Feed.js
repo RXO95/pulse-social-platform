@@ -4,11 +4,11 @@ import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import LikeButton from "../components/LikeButton";
-import Loader from "../components/Loader";
 import CommentButton from "../components/CommentButton";
 import BookmarkButton from "../components/BookmarkButton";
 import PostLoader from "../components/PostLoader";
 import DarkModeToggle from "../components/DarkModeToggle";
+import BottomNav from "../components/BottomNav";
 import useIsMobile from "../hooks/useIsMobile";
 
 function timeAgo(dateString) {
@@ -65,9 +65,9 @@ export default function Feed() {
     }
   };
 
-  const fetchPosts = async () => {
+  const fetchPosts = async (showLoader = true) => {
     try {
-      setIsLoading(true);
+      if (showLoader) setIsLoading(true);
       const res = await fetch(`${API}/posts/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -331,6 +331,7 @@ export default function Feed() {
 
   const createPost = async () => {
     if (!content.trim() && !mediaFile) return;
+    const startTime = Date.now();
     try {
       setIsPosting(true);
       
@@ -368,8 +369,14 @@ export default function Feed() {
       }
       setContent("");
       clearMedia();
-      fetchPosts();
+      await fetchPosts(false);
       fetchTrending();
+      
+      // Ensure loader shows for at least 1 second
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 1000) {
+        await new Promise(r => setTimeout(r, 1000 - elapsed));
+      }
     } catch {
       alert("Could not create post");
     } finally {
@@ -395,31 +402,24 @@ export default function Feed() {
 
           <div style={{ display: "flex", gap: mobile ? "6px" : "10px", alignItems: "center" }}>
             <DarkModeToggle />
-            <button 
-              onClick={() => navigate("/bookmarks")}
-              style={styles.profileBtn}
-              aria-label="Bookmarks"
-            >
-              {mobile ? "🔖" : "Bookmarks"}
-            </button>
             {!mobile && (
-              <button 
-                onClick={() => currentUser && navigate(`/profile/${currentUser.username}`)}
-                style={styles.profileBtn}
-              >
-                Profile
-              </button>
+              <>
+                <button 
+                  onClick={() => navigate("/bookmarks")}
+                  style={styles.profileBtn}
+                  aria-label="Bookmarks"
+                >
+                  Bookmarks
+                </button>
+                <button 
+                  onClick={() => currentUser && navigate(`/profile/${currentUser.username}`)}
+                  style={styles.profileBtn}
+                >
+                  Profile
+                </button>
+              </>
             )}
-            {mobile && (
-              <button 
-                onClick={() => currentUser && navigate(`/profile/${currentUser.username}`)}
-                style={styles.profileBtn}
-                aria-label="Profile"
-              >
-                👤
-              </button>
-            )}
-            <button onClick={logout} style={styles.logoutBtn}>{mobile ? "↗" : "Logout"}</button>
+            <button onClick={logout} style={styles.logoutBtn}>{mobile ? "Exit" : "Logout"}</button>
           </div>
         </div>
       </header>
@@ -428,7 +428,13 @@ export default function Feed() {
         <main style={styles.mainContent}>
           <div style={styles.card}>
             <div style={{display: "flex", gap: "12px"}}>
-              <div style={styles.composeAvatar}>{currentUser?.username?.charAt(0).toUpperCase() || "?"}</div>
+            <div style={styles.composeAvatar}>
+              {currentUser?.profile_pic_url ? (
+                <img src={currentUser.profile_pic_url} alt="" style={{width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover"}} />
+              ) : (
+                currentUser?.username?.charAt(0).toUpperCase() || "?"
+              )}
+            </div>
               <div style={{flex: 1, minWidth: 0}}>
                 <textarea
                   placeholder="What's happening?"
@@ -482,12 +488,23 @@ export default function Feed() {
           <div style={styles.feedList}>
             {isPosting && <PostLoader />}
             {isLoading ? (
-              <Loader />
+              <>
+                <PostLoader />
+                <PostLoader />
+                <PostLoader />
+                <PostLoader />
+              </>
             ) : (
               posts.map((p) => (
               <div key={p._id} style={styles.postCard}>
                 <div style={styles.postHeader}>
-                  <div style={styles.avatar}>{p.username?.charAt(0).toUpperCase()}</div>
+                  <div style={styles.avatar}>
+                    {p.profile_pic_url ? (
+                      <img src={p.profile_pic_url} alt="" style={{width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover"}} />
+                    ) : (
+                      p.username?.charAt(0).toUpperCase()
+                    )}
+                  </div>
                   <div style={styles.userMeta}>
                     <div style={styles.usernameRow}>
                       <strong 
@@ -584,18 +601,37 @@ export default function Feed() {
                     )}
 
                     <div style={styles.entityContainer}>
-                    {p.entities?.map((e, idx) => (
-                        <span 
-                          key={idx} 
-                          style={{...styles.tag, cursor: "pointer"}}
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            navigate(`/entity/${encodeURIComponent(e.text)}`);
-                          }}
-                        >
-                        {e.text} <small style={styles.tagLabel}>{e.label}</small>
-                        </span>
-                    ))}
+                    {p.entities?.map((e, idx) => {
+                        const isMention = e.source === "mention" || e.text.startsWith("@");
+                        const isHashtag = e.source === "hashtag" || e.text.startsWith("#");
+                        
+                        return (
+                          <span 
+                            key={idx} 
+                            style={{
+                              ...styles.tag, 
+                              cursor: "pointer",
+                              ...(isMention && styles.mentionTag),
+                              ...(isHashtag && styles.hashtagTag)
+                            }}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                              if (isMention) {
+                                // Navigate to user profile (strip @ symbol)
+                                navigate(`/profile/${e.text.replace('@', '')}`);
+                              } else if (isHashtag) {
+                                // Navigate to entity page with the identified_as or normalized text
+                                const entityName = e.identified_as || e.text.replace('#', '');
+                                navigate(`/entity/${encodeURIComponent(entityName)}`);
+                              } else {
+                                navigate(`/entity/${encodeURIComponent(e.text)}`);
+                              }
+                            }}
+                          >
+                          {e.text} <small style={styles.tagLabel}>{e.label}</small>
+                          </span>
+                        );
+                    })}
                     </div>
                 </div>
 
@@ -622,19 +658,35 @@ export default function Feed() {
 
         <aside style={styles.sidebar}>
           <div style={styles.trendingCard}>
-            <h3 style={styles.trendingTitle}>What's Happening</h3>
-            {trending.length > 0 ? trending.map((item, index) => (
-              <div key={index} style={styles.trendingItem} onClick={() => handleSearch(item.topic)}>
-                <div style={styles.trendingLabel}>{item.label} · Trending</div>
-                <div style={styles.trendingTopic}>#{item.topic}</div>
-                <div style={styles.trendingCount}>{item.count} posts</div>
-              </div>
-            )) : (
+            <h3 
+              style={{...styles.trendingTitle, cursor: "pointer"}} 
+              onClick={() => navigate("/trending")}
+            >
+              What's Happening
+            </h3>
+            {trending.length > 0 ? (
+              <>
+                {trending.slice(0, 5).map((item, index) => (
+                  <div key={index} style={styles.trendingItem} onClick={() => navigate(`/entity/${encodeURIComponent(item.topic)}`)}>
+                    <div style={styles.trendingLabel}>{item.label} · Trending</div>
+                    <div style={styles.trendingTopic}>#{item.topic}</div>
+                    <div style={styles.trendingCount}>{item.count} posts</div>
+                  </div>
+                ))}
+                <div 
+                  style={styles.showMoreLink} 
+                  onClick={() => navigate("/trending")}
+                >
+                  Show more
+                </div>
+              </>
+            ) : (
               <p style={{ fontSize: "14px", color: t.textSecondary }}>Nothing trending yet...</p>
             )}
           </div>
         </aside>
       </div>
+      {mobile && <BottomNav currentUser={currentUser} />}
     </div>
   );
 }
@@ -730,6 +782,7 @@ function getStyles(t, m) { return {
     flex: 1,
     overflowY: "auto",
     padding: "0",
+    paddingBottom: m ? "70px" : "0",
     maxWidth: "600px",
     width: "100%",
     borderRight: m ? "none" : `1px solid ${t.border}`,
@@ -758,6 +811,7 @@ function getStyles(t, m) { return {
   trendingLabel: { fontSize: "13px", color: t.textSecondary, fontWeight: "400" },
   trendingTopic: { fontSize: "15px", fontWeight: "700", margin: "2px 0", color: t.text },
   trendingCount: { fontSize: "13px", color: t.textSecondary },
+  showMoreLink: { padding: "16px", color: t.accentBlue, fontSize: "15px", cursor: "pointer", fontWeight: "500" },
   composeAvatar: { width: "40px", height: "40px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", color: "#1a1a1a", fontSize: "16px", flexShrink: 0 },
   card: { backgroundColor: t.cardBg, padding: m ? "12px" : "16px", borderBottom: `1px solid ${t.border}`, transition: "background-color 0.3s" },
   textarea: { width: "100%", minHeight: m ? "52px" : "56px", border: "none", outline: "none", fontSize: m ? "18px" : "20px", resize: "none", backgroundColor: "transparent", color: t.text, lineHeight: "1.4", padding: "8px 0" },
@@ -795,8 +849,10 @@ function getStyles(t, m) { return {
 
   riskBadge: { backgroundColor: t.riskBg, color: t.riskText, padding: "5px 10px", borderRadius: "4px", fontSize: "12px", marginTop: "8px", display: "inline-block" },
   entityContainer: { display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "10px" },
-  tag: { backgroundColor: t.tagBg, color: t.tagText, padding: "3px 10px", borderRadius: "9999px", fontSize: m ? "12px" : "13px", fontWeight: "500" },
+  tag: { backgroundColor: t.tagBg, color: t.tagText, padding: "3px 10px", borderRadius: "9999px", fontSize: m ? "12px" : "13px", fontWeight: "500", border: "1px solid transparent" },
   tagLabel: { color: t.textSecondary, fontSize: "11px", marginLeft: "2px" },
+  mentionTag: { backgroundColor: "rgba(29, 155, 240, 0.15)", borderColor: "#1d9bf0" },
+  hashtagTag: { backgroundColor: "rgba(0, 186, 124, 0.15)", borderColor: "#00ba7c" },
   actionSection: {
     display: "flex",
     alignItems: "center",

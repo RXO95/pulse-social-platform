@@ -6,6 +6,7 @@ import LikeButton from "../components/LikeButton";
 import CommentButton from "../components/CommentButton";
 import BookmarkButton from "../components/BookmarkButton";
 import DarkModeToggle from "../components/DarkModeToggle";
+import BottomNav from "../components/BottomNav";
 import Loader from "../components/Loader";
 import useIsMobile from "../hooks/useIsMobile";
 
@@ -17,6 +18,8 @@ export default function PostDetail() {
   const [newNote, setNewNote] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isRegeneratingContext, setIsRegeneratingContext] = useState(false);
   
   // --- NEW: Translation State ---
   const [translatedText, setTranslatedText] = useState(null);
@@ -175,10 +178,48 @@ export default function PostDetail() {
     }
   };
 
+  // --- Regenerate Context ---
+  const handleRegenerateContext = async () => {
+    if (isRegeneratingContext) return;
+    setIsRegeneratingContext(true);
+    try {
+      const res = await fetch(`${API}/posts/${postId}/regenerate-context`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPost(prev => ({
+          ...prev,
+          context_data: data.context_data
+        }));
+      } else {
+        const error = await res.json();
+        alert(error.detail || "Failed to regenerate context");
+      }
+    } catch {
+      alert("Failed to regenerate context");
+    } finally {
+      setIsRegeneratingContext(false);
+    }
+  };
+
   useEffect(() => {
     fetchPost();
     fetchNotes();
+    fetchCurrentUser();
   }, [postId]);
+
+  const fetchCurrentUser = async () => {
+    try {
+      const res = await fetch(`${API}/users/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setCurrentUser(await res.json());
+      }
+    } catch {}
+  };
 
   if (isLoading) return (
     <div style={{display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", backgroundColor: t.bg}}>
@@ -198,13 +239,63 @@ export default function PostDetail() {
   // --- HELPER: Context Box Component ---
   const renderContextBox = () => {
     const ctx = post.context_data;
-    if (!ctx || !ctx.is_generated) return null;
+    const hasContext = ctx && ctx.is_generated;
+    const hasEntities = post.entities && post.entities.length > 0;
+
+    // Show regenerate button if no context but has entities
+    if (!hasContext && hasEntities) {
+      return (
+        <div style={styles.contextBox}>
+          <div style={styles.contextHeader}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}>
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+            </svg>
+            <strong>Pulse Context</strong>
+          </div>
+          <p style={{color: t.textSecondary, fontSize: "14px", margin: "8px 0 12px"}}>
+            Generate Wikipedia info and related news for:
+          </p>
+          <div style={{display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "16px"}}>
+            {post.entities.map((ent, idx) => (
+              <span key={idx} style={styles.contextEntityTag}>
+                {ent.text}
+              </span>
+            ))}
+          </div>
+          <button 
+            onClick={handleRegenerateContext}
+            disabled={isRegeneratingContext}
+            style={styles.regenerateBtn}
+          >
+            {isRegeneratingContext ? "Generating..." : "Generate Pulse Context"}
+          </button>
+        </div>
+      );
+    }
+
+    if (!hasContext) return null;
 
     return (
       <div style={styles.contextBox}>
         <div style={styles.contextHeader}>
-          <span style={{fontSize: "18px"}}>ℹ️</span> 
-          <strong>Pulse Context</strong> 
+          <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}>
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+          </svg>
+          <strong>Pulse Context</strong>
+          <button 
+            onClick={handleRegenerateContext}
+            disabled={isRegeneratingContext}
+            style={styles.refreshBtn}
+            title="Regenerate context"
+          >
+            {isRegeneratingContext ? (
+              <span style={{fontSize: "12px"}}>...</span>
+            ) : (
+              <svg viewBox="0 0 24 24" width="16" height="16" fill={t.accentBlue}>
+                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+              </svg>
+            )}
+          </button>
         </div>
 
         {/* Disambiguation Section */}
@@ -255,7 +346,13 @@ export default function PostDetail() {
       {/* MAIN POST CARD */}
       <div style={styles.card}>
         <div style={styles.header}>
-           <div style={styles.avatar}>{post.username?.charAt(0).toUpperCase()}</div>
+           <div style={styles.avatar}>
+             {post.profile_pic_url ? (
+               <img src={post.profile_pic_url} alt="" style={{width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover"}} />
+             ) : (
+               post.username?.charAt(0).toUpperCase()
+             )}
+           </div>
            <strong style={{fontSize: "16px", color: t.text}}>@{post.username}</strong>
         </div>
         
@@ -345,6 +442,7 @@ export default function PostDetail() {
         </div>
       </div>
       </div>
+      {mobile && <BottomNav currentUser={currentUser} />}
     </div>
   );
 }
@@ -354,7 +452,7 @@ function getStyles(t, m) { return {
   navBar: { height: "53px", backgroundColor: t.headerBg, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", transition: "background-color 0.3s" },
   navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
   backButton: { background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: t.accentBlue, fontWeight: "600", flexShrink: 0 },
-  scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", padding: m ? "0" : "0", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
+  scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", padding: m ? "0" : "0", paddingBottom: m ? "70px" : "0", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
   
   card: { backgroundColor: t.cardBg, borderBottom: `1px solid ${t.border}`, padding: m ? "16px" : "20px", transition: "background-color 0.3s" },
   header: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" },
@@ -447,5 +545,37 @@ function getStyles(t, m) { return {
   
   notesList: { display: "flex", flexDirection: "column", gap: "0" },
   noteCard: { backgroundColor: "transparent", padding: m ? "12px 0" : "14px 0", borderBottom: `1px solid ${t.border}`, transition: "background-color 0.3s" },
-  noteHeader: { display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "13px", color: t.text }
+  noteHeader: { display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "13px", color: t.text },
+  
+  regenerateBtn: {
+    backgroundColor: t.accentBlue,
+    color: "#fff",
+    border: "none",
+    padding: "10px 20px",
+    borderRadius: "9999px",
+    fontWeight: "600",
+    fontSize: "14px",
+    cursor: "pointer",
+    transition: "all 0.2s"
+  },
+  refreshBtn: {
+    marginLeft: "auto",
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    padding: "4px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "background-color 0.2s"
+  },
+  contextEntityTag: {
+    backgroundColor: t.tagBg,
+    color: t.tagText,
+    padding: "4px 10px",
+    borderRadius: "9999px",
+    fontSize: "13px",
+    fontWeight: "500"
+  }
 }; }
