@@ -1,0 +1,26 @@
+# EAS Build ignore file
+# Speeds up upload by excluding unnecessary files
+
+# Large directories
+.git
+node_modules/.cache
+
+# Build outputs
+build/
+dist/
+*.tgz
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Other project folders (not needed for mobile build)
+../backend
+../frontend
+../frontend-simple
+../ml-service
+../model_result

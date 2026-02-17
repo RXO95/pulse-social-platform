@@ -28,7 +28,20 @@
     },
     "plugins": [
       "expo-asset",
-      "expo-font"
-    ]
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/ionicons.ttf"
+          ]
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "944de932-dc74-42d3-9825-ae92750b2706"
+      }
+    },
+    "owner": "rxo95"
   }
 }
