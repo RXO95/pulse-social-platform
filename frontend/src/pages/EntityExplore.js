@@ -6,15 +6,18 @@ import LikeButton from "../components/LikeButton";
 import CommentButton from "../components/CommentButton";
 import BookmarkButton from "../components/BookmarkButton";
 import DarkModeToggle from "../components/DarkModeToggle";
-import BottomNav from "../components/BottomNav";
+
 import PostLoader from "../components/PostLoader";
 import useIsMobile from "../hooks/useIsMobile";
 
 function timeAgo(dateString) {
   if (!dateString) return "";
   const now = new Date();
-  const date = new Date(dateString);
+  let raw = String(dateString);
+  if (!raw.endsWith("Z") && !raw.includes("+")) raw += "Z";
+  const date = new Date(raw);
   const seconds = Math.floor((now - date) / 1000);
+  if (seconds < 0) return "now";
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m`;
@@ -149,9 +152,11 @@ export default function EntityExplore() {
       <div style={styles.fullScreenWrapper}>
         <header style={styles.navBar}>
           <div style={styles.navContent}>
-            <button onClick={() => navigate(-1)} style={styles.backButton}>← Back</button>
+            <button onClick={() => navigate(-1)} style={styles.backButton}>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.414 13l5.043 5.04-1.414 1.42L3.586 12l7.457-7.46 1.414 1.42L7.414 11H21v2H7.414z"/></svg>
+            </button>
             <h3 style={{margin:0, color: t.text}}>Entity</h3>
-            <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>
+            {mobile && <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>}
           </div>
         </header>
         <div style={styles.scrollArea}>
@@ -159,7 +164,6 @@ export default function EntityExplore() {
           <PostLoader />
           <PostLoader />
         </div>
-        {mobile && <BottomNav currentUser={currentUser} />}
       </div>
     );
   }
@@ -169,9 +173,11 @@ export default function EntityExplore() {
       <div style={styles.fullScreenWrapper}>
         <header style={styles.navBar}>
           <div style={styles.navContent}>
-            <button onClick={() => navigate(-1)} style={styles.backButton}>← Back</button>
+            <button onClick={() => navigate(-1)} style={styles.backButton}>
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.414 13l5.043 5.04-1.414 1.42L3.586 12l7.457-7.46 1.414 1.42L7.414 11H21v2H7.414z"/></svg>
+            </button>
             <h3 style={{margin:0, color: t.text}}>Entity</h3>
-            <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>
+            {mobile && <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>}
           </div>
         </header>
         <div style={{padding: 40, textAlign: "center", color: t.textSecondary}}>
@@ -185,9 +191,11 @@ export default function EntityExplore() {
     <div style={styles.fullScreenWrapper}>
       <header style={styles.navBar}>
         <div style={styles.navContent}>
-          <button onClick={() => navigate(-1)} style={styles.backButton}>← Back</button>
+          <button onClick={() => navigate(-1)} style={styles.backButton}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.414 13l5.043 5.04-1.414 1.42L3.586 12l7.457-7.46 1.414 1.42L7.414 11H21v2H7.414z"/></svg>
+          </button>
           <h3 style={{margin:0, color: t.text}}>Explore Entity</h3>
-          <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>
+          {mobile && <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>}
         </div>
       </header>
 
@@ -337,16 +345,15 @@ export default function EntityExplore() {
           ))}
         </div>
       </div>
-      {mobile && <BottomNav currentUser={currentUser} />}
     </div>
   );
 }
 
 function getStyles(t, m) { return {
-  fullScreenWrapper: { height: "100vh", display: "flex", flexDirection: "column", backgroundColor: t.bg, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text, transition: "background-color 0.3s, color 0.3s" },
+  fullScreenWrapper: { flex: 1, display: "flex", flexDirection: "column", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text },
   navBar: { height: "53px", backgroundColor: t.headerBg, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", transition: "background-color 0.3s" },
   navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
-  backButton: { background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: t.accentBlue, fontWeight: "600", flexShrink: 0 },
+  backButton: { background: "none", border: "none", cursor: "pointer", padding: "8px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: t.text, flexShrink: 0 },
   scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", paddingBottom: m ? "70px" : "0", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
 
   entityHeader: { display: "flex", alignItems: "flex-start", gap: "16px", padding: m ? "20px 16px" : "24px 20px", borderBottom: `1px solid ${t.border}` },
@@ -359,7 +366,7 @@ function getStyles(t, m) { return {
   identifiedAs: { color: t.textSecondary, fontSize: "14px", marginTop: "8px", fontStyle: "italic" },
   translateBtn: { background: "none", border: "none", color: t.accentBlue, fontSize: "13px", fontWeight: "500", cursor: "pointer", padding: 0, marginBottom: "4px" },
 
-  wikiCard: { backgroundColor: t.contextBg, border: `1px solid ${t.border}`, margin: m ? "12px" : "16px", borderRadius: "12px", padding: m ? "14px" : "16px" },
+  wikiCard: { backgroundColor: t.contextBg, margin: m ? "12px" : "16px", borderRadius: "12px", padding: m ? "14px" : "16px" },
   wikiHeader: { display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px", color: t.text, fontWeight: "600" },
   wikiText: { color: t.text, fontSize: "14px", lineHeight: "1.5", margin: "0 0 10px 0" },
   wikiLink: { color: t.accentBlue, fontSize: "14px", fontWeight: "500", textDecoration: "none" },
@@ -367,7 +374,7 @@ function getStyles(t, m) { return {
   relatedSection: { padding: m ? "12px 16px" : "16px 20px", borderBottom: `1px solid ${t.border}` },
   sectionTitle: { fontSize: "16px", fontWeight: "700", color: t.text, margin: "0 0 12px 0" },
   relatedGrid: { display: "flex", flexWrap: "wrap", gap: "8px" },
-  relatedChip: { display: "flex", alignItems: "center", gap: "6px", backgroundColor: t.cardBg, border: `1px solid ${t.border}`, borderRadius: "9999px", padding: "6px 14px", fontSize: "14px", cursor: "pointer", transition: "all 0.2s", color: t.text },
+  relatedChip: { display: "flex", alignItems: "center", gap: "6px", backgroundColor: t.cardBg, borderRadius: "9999px", padding: "6px 14px", fontSize: "14px", cursor: "pointer", transition: "all 0.2s", color: t.text },
 
   postsSection: { padding: m ? "12px 0" : "16px 0" },
   postCard: { backgroundColor: t.cardBg, padding: m ? "12px 16px 4px" : "16px 20px 4px", borderBottom: `1px solid ${t.border}`, transition: "background-color 0.15s" },

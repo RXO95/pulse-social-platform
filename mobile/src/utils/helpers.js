@@ -9,8 +9,12 @@
 export function timeAgo(dateString) {
   if (!dateString) return "";
   const now = new Date();
-  const date = new Date(dateString);
+  // Backend stores UTC datetimes without Z suffix — force UTC parsing
+  let raw = String(dateString);
+  if (!raw.endsWith("Z") && !raw.includes("+")) raw += "Z";
+  const date = new Date(raw);
   const seconds = Math.floor((now - date) / 1000);
+  if (seconds < 0) return "now";
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m`;

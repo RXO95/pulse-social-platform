@@ -98,12 +98,18 @@ async def _send_push_notification(recipient_id: str, sender_username: str):
     import json
     import urllib.request
     import asyncio
+    import logging
+
+    logger = logging.getLogger("pulse.push")
 
     doc = await db.push_tokens.find_one({"user_id": recipient_id})
     if not doc or not doc.get("push_token"):
+        logger.info(f"No push token for user {recipient_id}")
         return
 
     push_token = doc["push_token"]
+    logger.info(f"Sending push to {push_token[:20]}... for user {recipient_id}")
+
     message = {
         "to": push_token,
         "title": f"New message from @{sender_username}",
@@ -127,14 +133,15 @@ async def _send_push_notification(recipient_id: str, sender_username: str):
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=5) as res:
-                res.read()
-        except Exception:
-            pass  # Push failure shouldn't break messaging
+            with urllib.request.urlopen(req, timeout=10) as res:
+                resp_body = res.read().decode("utf-8")
+                logger.info(f"Expo push response: {resp_body}")
+        except Exception as e:
+            logger.error(f"Push notification failed: {e}")
 
-    # Run blocking HTTP in thread pool so we don't block the event loop
+    # Run blocking HTTP in thread pool — await so it actually completes
     loop = asyncio.get_event_loop()
-    loop.run_in_executor(None, _do_send)
+    await loop.run_in_executor(None, _do_send)
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -405,11 +412,44 @@ async def websocket_endpoint(websocket: WebSocket, token: str):
 
     try:
         while True:
-            # Keep alive – client should send pings periodically
-            data = await websocket.receive_text()
-            # Echo a pong so the client knows the connection is alive
-            if data == "ping":
+            raw = await websocket.receive_text()
+
+            # Simple ping/pong keep-alive
+            if raw == "ping":
                 await websocket.send_text("pong")
+                continue
+
+            # Try to parse JSON for typed events (e.g. typing indicator)
+            try:
+                import json as _json
+                data = _json.loads(raw)
+            except Exception:
+                continue
+
+            if data.get("type") == "typing":
+                conv_id = data.get("conversation_id")
+                if not conv_id or not ObjectId.is_valid(conv_id):
+                    continue
+                conv = await db.conversations.find_one({"_id": ObjectId(conv_id)})
+                if not conv or uid not in conv.get("participants", []):
+                    continue
+                # Find the other participant and relay typing event
+                for pid in conv["participants"]:
+                    if pid != uid:
+                        peer_ws = _active_connections.get(pid)
+                        if peer_ws:
+                            try:
+                                # Look up sender username
+                                sender = await db.users.find_one(
+                                    {"_id": ObjectId(uid)}, {"username": 1}
+                                )
+                                await peer_ws.send_text(_json.dumps({
+                                    "type": "typing",
+                                    "conversation_id": conv_id,
+                                    "username": sender["username"] if sender else "Someone",
+                                }))
+                            except Exception:
+                                _active_connections.pop(pid, None)
     except WebSocketDisconnect:
         _active_connections.pop(uid, None)
     except Exception:

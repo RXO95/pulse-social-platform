@@ -4,7 +4,7 @@ import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import DarkModeToggle from "../components/DarkModeToggle";
-import BottomNav from "../components/BottomNav";
+
 import Loader from "../components/Loader";
 import useIsMobile from "../hooks/useIsMobile";
 
@@ -74,9 +74,11 @@ export default function Trending() {
     <div style={styles.fullScreenWrapper}>
       <header style={styles.navBar}>
         <div style={styles.navContent}>
-          <button onClick={() => navigate("/feed")} style={styles.backButton}>← Back</button>
+          <button onClick={() => navigate(-1)} style={styles.backButton}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.414 13l5.043 5.04-1.414 1.42L3.586 12l7.457-7.46 1.414 1.42L7.414 11H21v2H7.414z"/></svg>
+          </button>
           <h3 style={{margin: 0, color: t.text}}>Trending</h3>
-          <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>
+          {mobile && <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>}
         </div>
       </header>
 
@@ -123,20 +125,18 @@ export default function Trending() {
           </div>
         )}
       </div>
-      {mobile && <BottomNav currentUser={currentUser} />}
     </div>
   );
 }
 
 function getStyles(t, m) { return {
   fullScreenWrapper: { 
-    height: "100vh", 
+    flex: 1, 
     display: "flex", 
     flexDirection: "column", 
-    backgroundColor: t.bg, 
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
     color: t.text,
-    transition: "background-color 0.3s"
+    overflow: "hidden"
   },
   navBar: { 
     height: "53px", 
@@ -161,10 +161,14 @@ function getStyles(t, m) { return {
   backButton: { 
     background: "none", 
     border: "none", 
-    fontSize: "16px", 
     cursor: "pointer", 
-    color: t.accentBlue, 
-    fontWeight: "600"
+    padding: "8px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: t.text,
+    flexShrink: 0
   },
   scrollArea: { 
     flex: 1, 

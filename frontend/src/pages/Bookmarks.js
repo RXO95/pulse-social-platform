@@ -6,15 +6,17 @@ import LikeButton from "../components/LikeButton";
 import CommentButton from "../components/CommentButton";
 import BookmarkButton from "../components/BookmarkButton";
 import DarkModeToggle from "../components/DarkModeToggle";
-import BottomNav from "../components/BottomNav";
 import PostLoader from "../components/PostLoader";
 import useIsMobile from "../hooks/useIsMobile";
 
 function timeAgo(dateString) {
   if (!dateString) return "";
   const now = new Date();
-  const date = new Date(dateString);
+  let raw = String(dateString);
+  if (!raw.endsWith("Z") && !raw.includes("+")) raw += "Z";
+  const date = new Date(raw);
   const seconds = Math.floor((now - date) / 1000);
+  if (seconds < 0) return "now";
   if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m`;
@@ -102,9 +104,11 @@ export default function Bookmarks() {
     <div style={styles.fullScreenWrapper}>
       <header style={styles.navBar}>
         <div style={styles.navContent}>
-          <button onClick={() => navigate("/feed")} style={styles.backButton}>← Back</button>
+          <button onClick={() => navigate(-1)} style={styles.backButton}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.414 13l5.043 5.04-1.414 1.42L3.586 12l7.457-7.46 1.414 1.42L7.414 11H21v2H7.414z"/></svg>
+          </button>
           <h3 style={{margin:0, color: t.text}}>Bookmarks</h3>
-          <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>
+          {mobile && <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>}
         </div>
       </header>
 
@@ -201,16 +205,15 @@ export default function Bookmarks() {
           </div>
         )}
       </div>
-      {mobile && <BottomNav currentUser={currentUser} />}
     </div>
   );
 }
 
 function getStyles(t, m) { return {
-  fullScreenWrapper: { height: "100vh", display: "flex", flexDirection: "column", backgroundColor: t.bg, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text, transition: "background-color 0.3s, color 0.3s" },
+  fullScreenWrapper: { flex: 1, display: "flex", flexDirection: "column", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text },
   navBar: { height: "53px", backgroundColor: t.headerBg, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", transition: "background-color 0.3s" },
   navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
-  backButton: { background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: t.accentBlue, fontWeight: "600", flexShrink: 0 },
+  backButton: { background: "none", border: "none", cursor: "pointer", padding: "8px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: t.text, flexShrink: 0 },
   scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", paddingBottom: m ? "70px" : "0", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
 
   emptyState: { textAlign: "center", padding: "60px 20px" },

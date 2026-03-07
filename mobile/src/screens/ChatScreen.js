@@ -15,10 +15,26 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
+import { Audio } from "expo-av";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import api, { BASE_URL } from "../api/client";
 import { timeAgo } from "../utils/helpers";
 import { encryptMessage, decryptMessage, getPublicKeyJwk } from "../utils/crypto";
+
+// Pre-load sound assets
+const sendSoundFile = require("../../assets/happy-pop-2.mp3");
+const recvSoundFile = require("../../assets/happy-pop-3.mp3");
+
+async function playSound(file) {
+  try {
+    const { sound } = await Audio.Sound.createAsync(file);
+    await sound.playAsync();
+    // Unload after playback finishes
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.didJustFinish) sound.unloadAsync();
+    });
+  } catch {}
+}
 
 export default function ChatScreen({ route, navigation }) {
   const { otherUser } = route.params;
@@ -98,6 +114,7 @@ export default function ChatScreen({ route, navigation }) {
           if (data.type === "new_message" && data.conversation_id === convId) {
             setMessages((prev) => {
               if (prev.some((m) => m._id === data.message._id)) return prev;
+              playSound(recvSoundFile);
               return [...prev, data.message];
             });
           }
@@ -180,6 +197,7 @@ export default function ChatScreen({ route, navigation }) {
       setDecryptedCache((prev) => ({ ...prev, [res.data._id]: draft.trim() }));
       setMessages((prev) => [...prev, res.data]);
       setDraft("");
+      playSound(sendSoundFile);
     } catch (err) {
       console.error("Send failed:", err);
     } finally {

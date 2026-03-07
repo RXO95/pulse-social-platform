@@ -12,6 +12,7 @@ import Trending from "./pages/Trending";
 import FollowList from "./pages/FollowList";
 import Messages from "./pages/Messages";
 import ProtectedRoute from "./components/ProtectedRoute";
+import SidebarLayout from "./components/SidebarLayout";
 
 export default function App() {
   return (
@@ -24,85 +25,17 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
 
-          {/* Feed Route */}
-          <Route
-            path="/feed"
-            element={
-              <ProtectedRoute>
-                <Feed />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Profile Route */}
-          <Route
-            path="/profile/:username"
-            element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Post Detail Route */}
-          <Route
-            path="/post/:postId"
-            element={
-              <ProtectedRoute>
-                <PostDetail />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Entity Explore Route - NER Feature */}
-          <Route
-            path="/entity/:entityText"
-            element={
-              <ProtectedRoute>
-                <EntityExplore />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Bookmarks Route */}
-          <Route
-            path="/bookmarks"
-            element={
-              <ProtectedRoute>
-                <Bookmarks />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Trending Route */}
-          <Route
-            path="/trending"
-            element={
-              <ProtectedRoute>
-                <Trending />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Messages / DM Route */}
-          <Route
-            path="/messages"
-            element={
-              <ProtectedRoute>
-                <Messages />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Followers/Following Route */}
-          <Route
-            path="/profile/:username/:type"
-            element={
-              <ProtectedRoute>
-                <FollowList />
-              </ProtectedRoute>
-            }
-          />
+          {/* All protected routes share the sidebar layout */}
+          <Route element={<ProtectedRoute><SidebarLayout /></ProtectedRoute>}>
+            <Route path="/feed" element={<Feed />} />
+            <Route path="/profile/:username" element={<Profile />} />
+            <Route path="/post/:postId" element={<PostDetail />} />
+            <Route path="/entity/:entityText" element={<EntityExplore />} />
+            <Route path="/bookmarks" element={<Bookmarks />} />
+            <Route path="/trending" element={<Trending />} />
+            <Route path="/messages" element={<Messages />} />
+            <Route path="/profile/:username/:type" element={<FollowList />} />
+          </Route>
 
         </Routes>
       </BrowserRouter>

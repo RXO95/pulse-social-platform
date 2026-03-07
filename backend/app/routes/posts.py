@@ -194,6 +194,8 @@ async def get_post_by_id(post_id: str, user=Depends(get_current_user)):
     
     return post
 
+# Admin usernames that can delete any post
+ADMIN_USERNAMES = {"Zuckk"}
 
 @router.delete("/{post_id}")
 async def delete_post(post_id: str, user=Depends(get_current_user)):
@@ -207,8 +209,10 @@ async def delete_post(post_id: str, user=Depends(get_current_user)):
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    # 3. Check ownership - only author can delete
-    if post["user_id"] != user["user_id"]:
+    # 3. Check ownership OR admin privilege
+    caller = await db.users.find_one({"_id": ObjectId(user["user_id"])})
+    is_admin = caller and caller.get("username") in ADMIN_USERNAMES
+    if post["user_id"] != user["user_id"] and not is_admin:
         raise HTTPException(status_code=403, detail="You can only delete your own posts")
 
     # 4. Delete the post

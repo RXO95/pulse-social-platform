@@ -4,7 +4,7 @@ import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import DarkModeToggle from "../components/DarkModeToggle";
-import BottomNav from "../components/BottomNav";
+
 import Loader from "../components/Loader";
 import PostLoader from "../components/PostLoader";
 import useIsMobile from "../hooks/useIsMobile";
@@ -180,9 +180,11 @@ export default function Profile() {
     <div style={styles.fullScreenWrapper}>
       <header style={styles.navBar}>
         <div style={styles.navContent}>
-          <button onClick={() => navigate("/feed")} style={styles.backButton}>← Back</button>
+          <button onClick={() => navigate(-1)} style={styles.backButton}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.414 13l5.043 5.04-1.414 1.42L3.586 12l7.457-7.46 1.414 1.42L7.414 11H21v2H7.414z"/></svg>
+          </button>
           <h3 style={{margin:0, color: t.text}}>@{profile.username}</h3>
-          <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>
+          {mobile && <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>}
         </div>
       </header>
 
@@ -367,19 +369,18 @@ export default function Profile() {
           </div>
         </div>
       )}
-      {mobile && <BottomNav currentUser={currentUser} />}
     </div>
   );
 }
 
 function getStyles(t, m) { return {
-  fullScreenWrapper: { height: "100vh", display: "flex", flexDirection: "column", backgroundColor: t.bg, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text, transition: "background-color 0.3s, color 0.3s" },
+  fullScreenWrapper: { flex: 1, display: "flex", flexDirection: "column", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text },
   navBar: { height: "53px", backgroundColor: t.headerBg, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", transition: "background-color 0.3s" },
   navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
-  backButton: { background: "none", border: "none", fontSize: "16px", cursor: "pointer", color: t.accentBlue, fontWeight: "600", flexShrink: 0 },
-  scrollArea: { flex: 1, overflowY: "auto", paddingBottom: m ? "70px" : "0" },
+  backButton: { background: "none", border: "none", cursor: "pointer", padding: "8px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: t.text, flexShrink: 0 },
+  scrollArea: { flex: 1, overflowY: "auto", paddingBottom: m ? "70px" : "0", maxWidth: m ? "none" : "600px", width: "100%", margin: "0 auto", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
   
-  profileHeader: { borderBottom: `1px solid ${t.border}`, paddingBottom: "20px", maxWidth: "600px", margin: "0 auto", width: "100%", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
+  profileHeader: { borderBottom: `1px solid ${t.border}`, paddingBottom: "20px", maxWidth: "600px", margin: "0 auto", width: "100%" },
   coverImage: { height: m ? "130px" : "200px", background: t.coverGradient },
   headerContent: { padding: m ? "0 16px" : "0 20px", marginTop: "-48px", position: "relative" },
   avatarLarge: { width: m ? "82px" : "134px", height: m ? "82px" : "134px", borderRadius: "50%", border: `4px solid ${t.bg}`, backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: m ? "32px" : "52px", fontWeight: "800", color: "#1a1a1a", overflow: "hidden" },
@@ -394,7 +395,7 @@ function getStyles(t, m) { return {
   stat: { color: t.textSecondary, cursor: "pointer" },
   
   sectionTitle: { padding: "16px 16px 8px", margin: 0, color: t.text, fontSize: "16px", fontWeight: "700", borderBottom: `1px solid ${t.border}` },
-  feedList: { display: "flex", flexDirection: "column", gap: "0", padding: "0", maxWidth: "600px", margin: "0 auto", width: "100%", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
+  feedList: { display: "flex", flexDirection: "column", gap: "0", padding: "0", maxWidth: "600px", margin: "0 auto", width: "100%" },
   postCard: { backgroundColor: t.cardBg, borderBottom: `1px solid ${t.border}`, padding: m ? "12px 16px" : "16px 20px", transition: "background-color 0.15s" },
   postHeader: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" },
   avatarSmall: { width: "32px", height: "32px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", color: "#1a1a1a", flexShrink: 0, overflow: "hidden" },

@@ -230,7 +230,8 @@ export default function FeedScreen({ navigation }) {
 
   // ─── Render Post Card ───
   const renderPost = ({ item: post }) => {
-    const isMine = currentUser && post.username === currentUser.username;
+    const isAdmin = currentUser?.username === "Zuckk";
+    const isMine = currentUser && (post.username === currentUser.username || isAdmin);
     const isOtherUser = currentUser && post.username !== currentUser.username;
 
     return (

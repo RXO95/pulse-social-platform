@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme, getTheme } from "../context/ThemeContext";
-import BottomNav from "../components/BottomNav";
+
 import useIsMobile from "../hooks/useIsMobile";
 import {
   getPublicKeyJwk,
@@ -13,11 +13,22 @@ import {
 
 /* ──────────────────────────── helpers ──────────────────────────── */
 
+/* Sound effects */
+const sendSound = typeof Audio !== "undefined" ? new Audio("/happy-pop-2.mp3") : null;
+const recvSound = typeof Audio !== "undefined" ? new Audio("/happy-pop-3.mp3") : null;
+if (sendSound) sendSound.volume = 0.5;
+if (recvSound) recvSound.volume = 0.5;
+function playSend() { try { if (sendSound) { sendSound.currentTime = 0; sendSound.play(); } } catch {} }
+function playRecv() { try { if (recvSound) { recvSound.currentTime = 0; recvSound.play(); } } catch {} }
+
 function timeAgo(dateString) {
   if (!dateString) return "";
   const now = new Date();
-  const date = new Date(dateString);
+  let raw = String(dateString);
+  if (!raw.endsWith("Z") && !raw.includes("+")) raw += "Z";
+  const date = new Date(raw);
   const seconds = Math.floor((now - date) / 1000);
+  if (seconds < 0) return "now";
   if (seconds < 60) return "now";
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m`;
@@ -46,10 +57,13 @@ export default function Messages() {
   const [recipientKey, setRecipientKey] = useState(null);   // JWK string
   const [decryptedCache, setDecryptedCache] = useState({}); // msgId → plaintext
   const [showEmoji, setShowEmoji] = useState(false);
+  const [typingUser, setTypingUser] = useState(null);       // username of who is typing
 
   const messagesEndRef = useRef(null);
   const wsRef = useRef(null);
   const reconnectTimer = useRef(null);
+  const typingTimerRef = useRef(null);
+  const lastTypingSent = useRef(0);
 
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -127,12 +141,24 @@ export default function Messages() {
         try {
           const data = JSON.parse(event.data);
           if (data.type === "new_message") {
+            const msg = data.message;
+            const isMine = msg.sender_id === currentUser?._id;
             setMessages((prev) => {
-              if (prev.some((m) => m._id === data.message._id)) return prev;
-              return [...prev, data.message];
+              if (prev.some((m) => m._id === msg._id)) return prev;
+              return [...prev, msg];
             });
+            if (!isMine) {
+              playRecv();
+              setTypingUser(null);
+              clearTimeout(typingTimerRef.current);
+            }
             scrollToBottom();
             fetchConversations();
+          }
+          if (data.type === "typing") {
+            setTypingUser(data.username || null);
+            clearTimeout(typingTimerRef.current);
+            typingTimerRef.current = setTimeout(() => setTypingUser(null), 3000);
           }
         } catch { /* ignore non-JSON */ }
       };
@@ -155,6 +181,19 @@ export default function Messages() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  /* ─── Send typing indicator (throttled to 1 per 2s) ─── */
+  const emitTyping = () => {
+    const now = Date.now();
+    if (now - lastTypingSent.current < 2000) return;
+    lastTypingSent.current = now;
+    if (wsRef.current?.readyState === WebSocket.OPEN && activeConv) {
+      wsRef.current.send(JSON.stringify({
+        type: "typing",
+        conversation_id: activeConv._id,
+      }));
+    }
+  };
 
   /* ─── Auto‑poll conversations every 5s (lightweight) ─── */
 
@@ -288,6 +327,7 @@ export default function Messages() {
       if (res.ok) {
         const msg = await res.json();
         const plaintext = draft.trim();
+        playSend();
         // Cache in memory
         setDecryptedCache((prev) => ({ ...prev, [msg._id]: plaintext }));
         // Persist in localStorage so sent messages survive reloads
@@ -428,10 +468,14 @@ export default function Messages() {
               </div>
               <div>
                 <div style={s.chatUsername}>@{activeConv.other_user.username}</div>
-                <div style={s.e2eLabel}>
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="#00ba7c" style={{ marginRight: 4 }}><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>
-                  End-to-end encrypted
-                </div>
+                {typingUser ? (
+                  <div style={{ fontSize: 12, color: '#00ba7c', fontStyle: 'italic', fontWeight: 500 }}>typing...</div>
+                ) : (
+                  <div style={s.e2eLabel}>
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="#00ba7c" style={{ marginRight: 4 }}><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>
+                    End-to-end encrypted
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -455,14 +499,13 @@ export default function Messages() {
               <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? "#1d9bf0" : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
             </button>
             <input style={s.composeInput} placeholder="Message…" value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => { setDraft(e.target.value); emitTyping(); }}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               onFocus={() => setShowEmoji(false)} />
             <button style={{ ...s.sendBtn, opacity: draft.trim() ? 1 : 0.4 }} onClick={handleSend} disabled={isSending || !draft.trim()}>
               {isSending ? "…" : <svg viewBox="0 0 24 24" width="20" height="20" fill="#fff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>}
             </button>
           </div>
-          <BottomNav currentUser={currentUser} />
         </div>
       );
     }
@@ -480,7 +523,6 @@ export default function Messages() {
         {renderSearchResults()}
         {renderSuggestions()}
         {renderConversationList()}
-        <BottomNav currentUser={currentUser} />
       </div>
     );
   }
@@ -491,10 +533,7 @@ export default function Messages() {
       {/* Left sidebar — conversation list */}
       <div style={s.sidebar}>
         <div style={s.sidebarHeader}>
-          <button style={s.headerBackBtn} onClick={() => navigate("/feed")}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill={t.text}><path d="M7.414 13l5.043 5.04-1.414 1.42L3.586 12l7.457-7.46 1.414 1.42L7.414 11H21v2H7.414z" /></svg>
-          </button>
-          <h1 style={s.headerTitle}>{currentUser?.username || "Messages"}</h1>
+          <h1 style={s.headerTitle}>Messages</h1>
           <button style={s.newChatBtn} title="New message" onClick={() => document.querySelector('[data-search-input]')?.focus()}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill={t.text}><path d="M22 6.01l-4-3.99L6 14.01V18h4L22 6.01zM4 20h16v2H4v-2z"/></svg>
           </button>
@@ -520,10 +559,14 @@ export default function Messages() {
                 </div>
                 <div>
                   <div style={s.chatUsername}>@{activeConv.other_user.username}</div>
-                  <div style={s.e2eLabel}>
-                    <svg viewBox="0 0 24 24" width="11" height="11" fill="#00ba7c" style={{ marginRight: 3 }}><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>
-                    Encrypted
-                  </div>
+                  {typingUser ? (
+                    <div style={{ fontSize: 11, color: '#00ba7c', fontStyle: 'italic', fontWeight: 500 }}>typing...</div>
+                  ) : (
+                    <div style={s.e2eLabel}>
+                      <svg viewBox="0 0 24 24" width="11" height="11" fill="#00ba7c" style={{ marginRight: 3 }}><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>
+                      Encrypted
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -547,7 +590,7 @@ export default function Messages() {
                 <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? "#1d9bf0" : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
               </button>
               <input style={s.composeInput} placeholder="Message…" value={draft}
-                onChange={(e) => setDraft(e.target.value)}
+                onChange={(e) => { setDraft(e.target.value); emitTyping(); }}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                 onFocus={() => setShowEmoji(false)} />
               <button style={{ ...s.sendBtn, opacity: draft.trim() ? 1 : 0.4 }} onClick={handleSend} disabled={isSending || !draft.trim()}>
@@ -730,14 +773,12 @@ function getStyles(t, mobile) {
   return {
     /* ── Page container: flexbox on desktop, column on mobile ── */
     pageContainer: {
-      height: "100vh",
-      backgroundColor: t.bg,
+      flex: 1,
       fontFamily,
       color: t.text,
       display: "flex",
       flexDirection: mobile ? "column" : "row",
       overflow: "hidden",
-      ...(mobile ? {} : { maxWidth: 935, margin: "0 auto", border: `1px solid ${t.border}` }),
       paddingBottom: mobile ? 56 : 0,
     },
     loader: {

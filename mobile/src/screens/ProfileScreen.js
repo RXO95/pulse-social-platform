@@ -105,6 +105,56 @@ export default function ProfileScreen({ navigation, route }) {
     }
   };
 
+  // ─── Like ───
+  const handleLike = async (postId) => {
+    const post = posts.find((p) => p._id === postId);
+    if (!post) return;
+    const wasLiked = post.is_liked_by_user;
+    // Optimistic update
+    setPosts((prev) =>
+      prev.map((p) =>
+        p._id === postId
+          ? { ...p, is_liked_by_user: !wasLiked, likes: (p.likes || 0) + (wasLiked ? -1 : 1) }
+          : p
+      )
+    );
+    try {
+      if (wasLiked) {
+        await api.delete(`/likes/${postId}`);
+      } else {
+        await api.post(`/likes/${postId}`);
+      }
+    } catch {
+      // Revert on failure
+      setPosts((prev) =>
+        prev.map((p) =>
+          p._id === postId
+            ? { ...p, is_liked_by_user: wasLiked, likes: (p.likes || 0) + (wasLiked ? 1 : -1) }
+            : p
+        )
+      );
+    }
+  };
+
+  // ─── Delete ───
+  const handleDelete = (postId) => {
+    Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await api.delete(`/posts/${postId}`);
+            setPosts((prev) => prev.filter((p) => p._id !== postId));
+          } catch {
+            Alert.alert("Error", "Failed to delete post");
+          }
+        },
+      },
+    ]);
+  };
+
   // ─── Edit Profile ───
   const openEdit = () => {
     setEditUsername(profile.username || "");
@@ -176,14 +226,45 @@ export default function ProfileScreen({ navigation, route }) {
         <Image source={{ uri: post.media_url }} style={styles.postMedia} resizeMode="cover" />
       )}
       <View style={styles.postFooter}>
-        <Ionicons
-          name={post.is_liked_by_user ? "heart" : "heart-outline"}
-          size={18}
-          color={post.is_liked_by_user ? "#f91880" : t.textSecondary}
-        />
-        <Text style={{ color: t.textSecondary, fontSize: 13, marginLeft: 4 }}>
-          {post.likes || 0}
-        </Text>
+        {/* Like */}
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => handleLike(post._id)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons
+            name={post.is_liked_by_user ? "heart" : "heart-outline"}
+            size={20}
+            color={post.is_liked_by_user ? "#f91880" : t.textSecondary}
+          />
+          <Text style={{ color: t.textSecondary, fontSize: 13, marginLeft: 4 }}>
+            {post.likes || 0}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Comment */}
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => navigation.navigate("PostDetail", { postId: post._id })}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="chatbubble-outline" size={18} color={t.accentBlue} />
+          <Text style={{ color: t.textSecondary, fontSize: 13, marginLeft: 4 }}>
+            {post.comment_count || 0}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Delete (own posts or admin) */}
+        {(isOwnProfile || currentUser?.username === "Zuckk") && (
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => handleDelete(post._id)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="trash-outline" size={18} color="#f4212e" />
+          </TouchableOpacity>
+        )}
+
         <Text style={{ color: t.textSecondary, fontSize: 12, marginLeft: "auto" }}>
           {timeAgo(post.created_at)}
         </Text>
@@ -227,7 +308,7 @@ export default function ProfileScreen({ navigation, route }) {
             }
           >
             <Text style={[styles.statText, { color: t.text }]}>
-              <Text style={styles.statNumber}>{profile.followers_count ?? 0}</Text> Followers
+              <Text style={styles.statNumber}>{profile.stats?.followers ?? 0}</Text> Followers
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -240,7 +321,7 @@ export default function ProfileScreen({ navigation, route }) {
             }
           >
             <Text style={[styles.statText, { color: t.text }]}>
-              <Text style={styles.statNumber}>{profile.following_count ?? 0}</Text> Following
+              <Text style={styles.statNumber}>{profile.stats?.following ?? 0}</Text> Following
             </Text>
           </TouchableOpacity>
         </View>
@@ -486,7 +567,8 @@ const styles = StyleSheet.create({
   },
   postContent: { fontSize: 15, lineHeight: 22 },
   postMedia: { width: "100%", height: 180, borderRadius: 10, marginTop: 8 },
-  postFooter: { flexDirection: "row", alignItems: "center", marginTop: 10 },
+  postFooter: { flexDirection: "row", alignItems: "center", marginTop: 10, gap: 16 },
+  actionBtn: { flexDirection: "row", alignItems: "center" },
 
   emptyWrap: { alignItems: "center", marginTop: 40 },
 

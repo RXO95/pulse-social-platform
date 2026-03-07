@@ -1,11 +1,34 @@
+import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import API from "../api/api";
 
 export default function BottomNav({ currentUser }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { darkMode } = useTheme();
   const t = getTheme(darkMode);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread message count on mount + every 30s
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch(`${API}/messages/unread-count`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUnreadCount(data.unread || 0);
+        }
+      } catch {}
+    };
+    fetchUnread();
+    const iv = setInterval(fetchUnread, 30000);
+    return () => clearInterval(iv);
+  }, [location.pathname]);
 
   const isActive = (path) => {
     if (path === "/feed") return location.pathname === "/feed";
@@ -100,7 +123,12 @@ export default function BottomNav({ currentUser }) {
             }}
             style={styles.navItem(t, active)}
           >
-            {item.icon(active)}
+            <div style={{ position: "relative", display: "inline-flex" }}>
+              {item.icon(active)}
+              {item.path === "/messages" && unreadCount > 0 && (
+                <span style={styles.badge}>{unreadCount > 99 ? "99+" : unreadCount}</span>
+              )}
+            </div>
             <span style={styles.navLabel(t, active)}>{item.label}</span>
           </button>
         );
@@ -144,5 +172,22 @@ const styles = {
     fontWeight: active ? "600" : "500",
     color: active ? t.accentBlue : t.textSecondary,
     marginTop: "2px"
-  })
+  }),
+  badge: {
+    position: "absolute",
+    top: "-6px",
+    right: "-10px",
+    backgroundColor: "#e0245e",
+    color: "#fff",
+    fontSize: "10px",
+    fontWeight: "700",
+    minWidth: "16px",
+    height: "16px",
+    borderRadius: "8px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0 4px",
+    lineHeight: 1,
+  }
 };
