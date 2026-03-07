@@ -1,9 +1,9 @@
+# Must match the model's config.json id2label / label2id exactly
 LABEL_LIST = [
     "O",
     "B-PER", "I-PER",
-    "B-ORG", "I-ORG",
     "B-LOC", "I-LOC",
-    "B-MISC", "I-MISC"
+    "B-ORG", "I-ORG",
 ]
 
 id2label = {i: label for i, label in enumerate(LABEL_LIST)}

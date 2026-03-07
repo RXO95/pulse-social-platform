@@ -18,7 +18,7 @@ def health():
 def analyze_text(request: TextRequest):
     entities = run_ner(request.text)
 
-    sensitive_labels = {"PERSON", "ORG", "GPE", "LOC"}
+    sensitive_labels = {"PER", "ORG", "LOC"}
 
     risk_score = min(1.0, len(entities) * 0.25)
 

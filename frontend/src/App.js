@@ -10,6 +10,7 @@ import EntityExplore from "./pages/EntityExplore";
 import Bookmarks from "./pages/Bookmarks";
 import Trending from "./pages/Trending";
 import FollowList from "./pages/FollowList";
+import Messages from "./pages/Messages";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
@@ -79,6 +80,16 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Trending />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Messages / DM Route */}
+          <Route
+            path="/messages"
+            element={
+              <ProtectedRoute>
+                <Messages />
               </ProtectedRoute>
             }
           />

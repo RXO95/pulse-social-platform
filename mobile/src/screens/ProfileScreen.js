@@ -281,22 +281,31 @@ export default function ProfileScreen({ navigation, route }) {
             </View>
           </View>
         ) : (
-          <TouchableOpacity
-            style={[
-              styles.followBtn,
-              profile.is_followed_by_user && { backgroundColor: "transparent", borderColor: t.border, borderWidth: 1 },
-            ]}
-            onPress={handleFollowToggle}
-          >
-            <Text
-              style={{
-                color: profile.is_followed_by_user ? t.text : "#fff",
-                fontWeight: "700",
-              }}
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity
+              style={[
+                styles.followBtn,
+                profile.is_followed_by_user && { backgroundColor: "transparent", borderColor: t.border, borderWidth: 1 },
+              ]}
+              onPress={handleFollowToggle}
             >
-              {profile.is_followed_by_user ? "Following" : "Follow"}
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={{
+                  color: profile.is_followed_by_user ? t.text : "#fff",
+                  fontWeight: "700",
+                }}
+              >
+                {profile.is_followed_by_user ? "Following" : "Follow"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.followBtn, { backgroundColor: "transparent", borderColor: t.border, borderWidth: 1 }]}
+              onPress={() => navigation.navigate("Chat", { conversationId: null, otherUser: { user_id: profile.user_id, username: profile.username, profile_pic_url: profile.profile_pic_url } })}
+            >
+              <Ionicons name="chatbubble-outline" size={16} color={t.text} style={{ marginRight: 4 }} />
+              <Text style={{ color: t.text, fontWeight: "700" }}>Message</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 

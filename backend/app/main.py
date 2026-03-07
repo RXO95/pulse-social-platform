@@ -13,6 +13,7 @@ from app.routes.comments import router as comments_router
 from app.routes.translate import router as translate_router
 from app.routes.entities import router as entities_router
 from app.routes.bookmarks import router as bookmarks_router
+from app.routes.messages import router as messages_router
 
 app = FastAPI(
     title="Pulse Backend API",
@@ -42,6 +43,7 @@ app.include_router(comments_router)
 app.include_router(translate_router)
 app.include_router(entities_router)
 app.include_router(bookmarks_router)
+app.include_router(messages_router)
 
 @app.get("/")
 def root():

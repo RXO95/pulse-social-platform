@@ -25,7 +25,7 @@ async def list_all_entities(
 ):
     """
     List all unique entities extracted across all posts.
-    Optionally filter by label type (PER, ORG, LOC, GPE).
+    Optionally filter by label type (PER, ORG, LOC).
     
     This is a core NER feature - browse the knowledge graph of extracted entities.
     """
@@ -70,7 +70,7 @@ async def list_all_entities(
 async def entity_statistics(user=Depends(get_current_user)):
     """
     Get statistics about entity distribution across the platform.
-    Shows breakdown by entity type (PER, ORG, LOC, GPE).
+    Shows breakdown by entity type (PER, ORG, LOC).
     """
     pipeline = [
         {"$unwind": "$entities"},
@@ -193,7 +193,7 @@ async def trending_entities_today(user=Depends(get_current_user)):
     pipeline_today = [
         {"$match": {"created_at": {"$gte": yesterday}}},
         {"$unwind": "$entities"},
-        {"$match": {"entities.label": {"$in": ["PER", "ORG", "GPE", "LOC"]}}},
+        {"$match": {"entities.label": {"$in": ["PER", "ORG", "LOC"]}}},
         {"$group": {
             "_id": {"text": "$entities.text", "label": "$entities.label"},
             "count": {"$sum": 1}

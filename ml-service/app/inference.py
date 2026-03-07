@@ -1,4 +1,5 @@
 from transformers import pipeline
+from app.utils.refinement import refine_entities
 
 MODEL_PATH = "models/ner_model"
 
@@ -28,7 +29,11 @@ def run_ner(text: str):
         
         entities.append({
             "text": actual_text,
-            "label": ent["entity_group"]
+            "label": ent["entity_group"],
+            "confidence": round(float(ent.get("score", 0)), 4),
         })
+
+    # Run the refinement layer: reclassify, discover missed, merge, filter
+    entities = refine_entities(text, entities)
 
     return entities

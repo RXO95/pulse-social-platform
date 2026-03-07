@@ -1,8 +1,12 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import {
+  registerForPushNotifications,
+  addNotificationResponseListener,
+} from "../utils/notifications";
 
 import FeedScreen from "../screens/FeedScreen";
 import TrendingScreen from "../screens/TrendingScreen";
@@ -11,6 +15,8 @@ import ProfileScreen from "../screens/ProfileScreen";
 import PostDetailScreen from "../screens/PostDetailScreen";
 import EntityExploreScreen from "../screens/EntityExploreScreen";
 import FollowListScreen from "../screens/FollowListScreen";
+import ConversationsScreen from "../screens/ConversationsScreen";
+import ChatScreen from "../screens/ChatScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -60,10 +66,41 @@ function ProfileStack() {
   );
 }
 
+// ─── Messages stack ───
+function MessagesStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="ConversationsHome" component={ConversationsScreen} />
+      <Stack.Screen name="Chat" component={ChatScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+    </Stack.Navigator>
+  );
+}
+
 // ─── Main Tab Navigator ───
 export default function MainTabs() {
   const { darkMode } = useTheme();
   const t = getTheme(darkMode);
+  const navigationRef = useRef(null);
+
+  // Register push notifications on mount
+  useEffect(() => {
+    registerForPushNotifications();
+  }, []);
+
+  // Handle notification tap → navigate to Messages
+  useEffect(() => {
+    const sub = addNotificationResponseListener((response) => {
+      const data = response.notification.request.content.data;
+      if (data?.type === "new_message") {
+        // Navigate to Messages tab
+        try {
+          navigationRef.current?.navigate("Messages");
+        } catch { /* ignore */ }
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   return (
     <Tab.Navigator
@@ -82,6 +119,9 @@ export default function MainTabs() {
             case "Feed":
               iconName = focused ? "home" : "home-outline";
               break;
+            case "Messages":
+              iconName = focused ? "chatbubbles" : "chatbubbles-outline";
+              break;
             case "Trending":
               iconName = focused ? "flash" : "flash-outline";
               break;
@@ -97,6 +137,7 @@ export default function MainTabs() {
       })}
     >
       <Tab.Screen name="Feed" component={FeedStack} />
+      <Tab.Screen name="Messages" component={MessagesStack} />
       <Tab.Screen name="Trending" component={TrendingStack} />
       <Tab.Screen name="Bookmarks" component={BookmarksStack} />
       <Tab.Screen name="Me" component={ProfileStack} />

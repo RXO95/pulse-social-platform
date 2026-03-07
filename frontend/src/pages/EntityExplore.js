@@ -130,7 +130,7 @@ export default function EntityExplore() {
     switch (label) {
       case "PER": return <svg viewBox="0 0 24 24" width="24" height="24" fill={color}><path d="M12 4c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2m0-2C9.79 2 8 3.79 8 6s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 9c-2.35 0-4.37.85-5.86 2.44-1.48 1.58-2.37 3.8-2.63 6.46l-.11 1.1h17.2l-.11-1.1c-.26-2.66-1.15-4.88-2.63-6.46C16.37 11.85 14.35 11 12 11z"/></svg>;
       case "ORG": return <svg viewBox="0 0 24 24" width="24" height="24" fill={color}><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg>;
-      case "LOC": case "GPE": return <svg viewBox="0 0 24 24" width="24" height="24" fill={color}><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>;
+      case "LOC": return <svg viewBox="0 0 24 24" width="24" height="24" fill={color}><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>;
       default: return <svg viewBox="0 0 24 24" width="24" height="24" fill={color}><path d="M17.63 5.84C17.27 5.33 16.67 5 16 5L5 5.01C3.9 5.01 3 5.9 3 7v10c0 1.1.9 1.99 2 1.99L16 19c.67 0 1.27-.33 1.63-.84L22 12l-4.37-6.16z"/></svg>;
     }
   };
@@ -140,7 +140,6 @@ export default function EntityExplore() {
       case "PER": return "Person";
       case "ORG": return "Organization";
       case "LOC": return "Location";
-      case "GPE": return "Place";
       default: return "Entity";
     }
   };

@@ -402,29 +402,78 @@ export default function Feed() {
 
           <div style={{ display: "flex", gap: mobile ? "6px" : "10px", alignItems: "center" }}>
             <DarkModeToggle />
-            {!mobile && (
+            {mobile && (
               <>
-                <button 
-                  onClick={() => navigate("/bookmarks")}
-                  style={styles.profileBtn}
-                  aria-label="Bookmarks"
+                <button
+                  onClick={() => navigate("/messages")}
+                  style={styles.iconBtn}
+                  aria-label="Messages"
+                  title="Messages"
                 >
-                  Bookmarks
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill={t.text}>
+                    <path d="M1.998 5.5c0-1.381 1.119-2.5 2.5-2.5h15c1.381 0 2.5 1.119 2.5 2.5v13c0 1.381-1.119 2.5-2.5 2.5h-15c-1.381 0-2.5-1.119-2.5-2.5v-13zm2.5-.5c-.276 0-.5.224-.5.5v2.764l8 5.14 8-5.14V5.5c0-.276-.224-.5-.5-.5h-15zm15.5 4.971l-8 5.14-8-5.14V18.5c0 .276.224.5.5.5h15c.276 0 .5-.224.5-.5v-8.529z"/>
+                  </svg>
                 </button>
-                <button 
-                  onClick={() => currentUser && navigate(`/profile/${currentUser.username}`)}
-                  style={styles.profileBtn}
-                >
-                  Profile
-                </button>
+                <button onClick={logout} style={styles.logoutBtn}>Exit</button>
               </>
             )}
-            <button onClick={logout} style={styles.logoutBtn}>{mobile ? "Exit" : "Logout"}</button>
           </div>
         </div>
       </header>
 
       <div style={styles.layoutBody}>
+        {/* Left Sidebar - Navigation */}
+        {!mobile && (
+          <nav style={styles.leftSidebar}>
+            <div style={styles.navCard}>
+              <button
+                onClick={() => navigate("/feed")}
+                style={styles.sidebarNavBtn}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = t.hoverBg}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+              >
+                <svg viewBox="0 0 24 24" width="24" height="24" fill={t.text}>
+                  <path d="M12 1.696L.622 8.807l1.06 1.696L3 9.679V19.5C3 20.881 4.119 22 5.5 22h13c1.381 0 2.5-1.119 2.5-2.5V9.679l1.318.824 1.06-1.696L12 1.696zM12 16.5c-1.933 0-3.5-1.567-3.5-3.5s1.567-3.5 3.5-3.5 3.5 1.567 3.5 3.5-1.567 3.5-3.5 3.5z"/>
+                </svg>
+                <span>Home</span>
+              </button>
+              <button
+                onClick={() => navigate("/messages")}
+                style={styles.sidebarNavBtn}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = t.hoverBg}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+              >
+                <svg viewBox="0 0 24 24" width="24" height="24" fill={t.text}>
+                  <path d="M1.998 5.5c0-1.381 1.119-2.5 2.5-2.5h15c1.381 0 2.5 1.119 2.5 2.5v13c0 1.381-1.119 2.5-2.5 2.5h-15c-1.381 0-2.5-1.119-2.5-2.5v-13zm2.5-.5c-.276 0-.5.224-.5.5v2.764l8 5.14 8-5.14V5.5c0-.276-.224-.5-.5-.5h-15zm15.5 4.971l-8 5.14-8-5.14V18.5c0 .276.224.5.5.5h15c.276 0 .5-.224.5-.5v-8.529z"/>
+                </svg>
+                <span>Messages</span>
+              </button>
+              <button
+                onClick={() => navigate("/bookmarks")}
+                style={styles.sidebarNavBtn}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = t.hoverBg}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+              >
+                <svg viewBox="0 0 24 24" width="24" height="24" fill={t.text}>
+                  <path d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5zM6.5 4c-.276 0-.5.22-.5.5v14.56l6-4.29 6 4.29V4.5c0-.28-.224-.5-.5-.5h-11z"/>
+                </svg>
+                <span>Bookmarks</span>
+              </button>
+              <button
+                onClick={() => currentUser && navigate(`/profile/${currentUser.username}`)}
+                style={styles.sidebarNavBtn}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = t.hoverBg}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+              >
+                <svg viewBox="0 0 24 24" width="24" height="24" fill={t.text}>
+                  <path d="M5.651 19h12.698c-.337-1.8-1.023-3.21-1.945-4.19C15.318 13.65 13.838 13 12 13s-3.317.65-4.404 1.81c-.922.98-1.608 2.39-1.945 4.19zm.486-5.56C7.627 11.85 9.648 11 12 11s4.373.85 5.863 2.44c1.477 1.58 2.366 3.8 2.632 6.46l.11 1.1H3.395l.11-1.1c.266-2.66 1.155-4.88 2.632-6.46zM12 4c1.105 0 2 .9 2 2s-.895 2-2 2-2-.9-2-2 .895-2 2-2zm0-2C9.791 2 8 3.79 8 6s1.791 4 4 4 4-1.79 4-4-1.791-4-4-4z"/>
+                </svg>
+                <span>Profile</span>
+              </button>
+            </div>
+          </nav>
+        )}
+
         <main style={styles.mainContent}>
           <div style={styles.card}>
             <div style={{display: "flex", gap: "12px"}}>
@@ -735,6 +784,15 @@ function getStyles(t, m) { return {
     flex: 1,
     overflow: "hidden"
   },
+  leftSidebar: {
+    width: "260px",
+    padding: "16px 12px",
+    overflowY: "auto",
+    flexShrink: 0,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end"
+  },
   logoGroup: { display: "flex", alignItems: "center", gap: "10px" },
   logoImage: {
     height: m ? "28px" : "34px",
@@ -765,6 +823,18 @@ function getStyles(t, m) { return {
     color: t.text,
     flexShrink: 0,
     transition: "all 0.2s"
+  },
+  iconBtn: {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    padding: "6px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "background-color 0.2s",
+    flexShrink: 0
   },
   profileBtn: {
     backgroundColor: t.accent,
@@ -812,6 +882,27 @@ function getStyles(t, m) { return {
   trendingTopic: { fontSize: "15px", fontWeight: "700", margin: "2px 0", color: t.text },
   trendingCount: { fontSize: "13px", color: t.textSecondary },
   showMoreLink: { padding: "16px", color: t.accentBlue, fontSize: "15px", cursor: "pointer", fontWeight: "500" },
+  navCard: {
+    width: "220px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px"
+  },
+  sidebarNavBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: "20px",
+    width: "100%",
+    padding: "12px 16px",
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    fontSize: "20px",
+    fontWeight: "400",
+    color: t.text,
+    transition: "background-color 0.15s",
+    borderRadius: "9999px"
+  },
   composeAvatar: { width: "40px", height: "40px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", color: "#1a1a1a", fontSize: "16px", flexShrink: 0 },
   card: { backgroundColor: t.cardBg, padding: m ? "12px" : "16px", borderBottom: `1px solid ${t.border}`, transition: "background-color 0.3s" },
   textarea: { width: "100%", minHeight: m ? "52px" : "56px", border: "none", outline: "none", fontSize: m ? "18px" : "20px", resize: "none", backgroundColor: "transparent", color: t.text, lineHeight: "1.4", padding: "8px 0" },

@@ -77,7 +77,7 @@ VIOLENT_KEYWORDS = [
     "maar", "hatya", "khoon", "marne", "hamla"
 ]
 
-SENSITIVE_LABELS = {"PER", "ORG", "GPE", "LOC"}
+SENSITIVE_LABELS = {"PER", "ORG", "LOC"}
 
 
 # --- HASHTAG & MENTION EXTRACTION ---
@@ -144,25 +144,104 @@ def find_matching_entity(normalized_tag: str, entities: list, known_entities: di
 
 # --- MULTILINGUAL DICTIONARY ---
 KNOWN_ENTITIES = {
-    # Hinglish / Slang
+    # ── Hinglish / Slang → PER ──
     "raga": ("Rahul Gandhi", "PER"),
     "namo": ("Narendra Modi", "PER"),
     "pappu": ("Rahul Gandhi", "PER"),
     "kejri": ("Arvind Kejriwal", "PER"),
     "yogi": ("Yogi Adityanath", "PER"),
-    
-    # Marathi / Hindi (Roots)
+    "feku": ("Narendra Modi", "PER"),
+    "didi": ("Mamata Banerjee", "PER"),
+    "pawar saheb": ("Sharad Pawar", "PER"),
+    "bapu": ("Mahatma Gandhi", "PER"),
+    "iron man of india": ("Sardar Vallabhbhai Patel", "PER"),
+
+    # ── Hindi / Devanagari Persons ──
     "शिवाजी": ("Chhatrapati Shivaji Maharaj", "PER"),
-    "पुणे": ("Pune", "LOC"),
-    "मुंबई": ("Mumbai", "LOC"),
     "ठाकरे": ("Bal Thackeray", "PER"),
     "फडणवीस": ("Devendra Fadnavis", "PER"),
     "पवार": ("Sharad Pawar", "PER"),
     "शिंदे": ("Eknath Shinde", "PER"),
     "मोदी": ("Narendra Modi", "PER"),
-    "भारत": ("India", "GPE"),
+    "केजरीवाल": ("Arvind Kejriwal", "PER"),
+    "राहुल गांधी": ("Rahul Gandhi", "PER"),
+    "अमित शाह": ("Amit Shah", "PER"),
+    "योगी": ("Yogi Adityanath", "PER"),
+    "ममता": ("Mamata Banerjee", "PER"),
+    "विराट कोहली": ("Virat Kohli", "PER"),
+    "धोनी": ("MS Dhoni", "PER"),
+    "सचिन": ("Sachin Tendulkar", "PER"),
+    "शाहरुख": ("Shah Rukh Khan", "PER"),
+    "अमिताभ": ("Amitabh Bachchan", "PER"),
+
+    # ── Hindi / Devanagari Locations ──
+    "पुणे": ("Pune", "LOC"),
+    "मुंबई": ("Mumbai", "LOC"),
+    "भारत": ("India", "LOC"),
     "दिल्ली": ("Delhi", "LOC"),
-    "केजरीवाल": ("Arvind Kejriwal", "PER")
+    "जयपुर": ("Jaipur", "LOC"),
+    "लखनऊ": ("Lucknow", "LOC"),
+    "अयोध्या": ("Ayodhya", "LOC"),
+    "काशी": ("Varanasi", "LOC"),
+    "हरिद्वार": ("Haridwar", "LOC"),
+    "कश्मीर": ("Kashmir", "LOC"),
+    "राजस्थान": ("Rajasthan", "LOC"),
+    "गुजरात": ("Gujarat", "LOC"),
+    "महाराष्ट्र": ("Maharashtra", "LOC"),
+
+    # ── Hindi / Devanagari Orgs ──
+    "भाजपा": ("BJP", "ORG"),
+    "कांग्रेस": ("Congress", "ORG"),
+    "आप": ("AAP", "ORG"),
+    "शिवसेना": ("Shiv Sena", "ORG"),
+    "राकांपा": ("NCP", "ORG"),
+    "बसपा": ("BSP", "ORG"),
+    "सपा": ("Samajwadi Party", "ORG"),
+    "इसरो": ("ISRO", "ORG"),
+    "आरबीआई": ("RBI", "ORG"),
+
+    # ── Religious/Monument Locations (Hinglish) ──
+    "ram mandir": ("Ram Mandir", "LOC"),
+    "ram temple": ("Ram Mandir", "LOC"),
+    "somnath temple": ("Somnath Temple", "LOC"),
+    "kashi vishwanath": ("Kashi Vishwanath Temple", "LOC"),
+    "golden temple": ("Golden Temple", "LOC"),
+    "taj mahal": ("Taj Mahal", "LOC"),
+    "red fort": ("Red Fort", "LOC"),
+    "lal qila": ("Red Fort", "LOC"),
+    "india gate": ("India Gate", "LOC"),
+    "jama masjid": ("Jama Masjid", "LOC"),
+    "haji ali": ("Haji Ali Dargah", "LOC"),
+    "qutub minar": ("Qutub Minar", "LOC"),
+    "gateway of india": ("Gateway of India", "LOC"),
+    "akshardham": ("Akshardham Temple", "LOC"),
+    "vaishno devi": ("Vaishno Devi Temple", "LOC"),
+    "kedarnath": ("Kedarnath Temple", "LOC"),
+    "badrinath": ("Badrinath Temple", "LOC"),
+    "tirupati balaji": ("Tirupati Balaji Temple", "LOC"),
+    "siddhivinayak": ("Siddhivinayak Temple", "LOC"),
+
+    # ── Indian Orgs (Hinglish) ──
+    "bjp": ("BJP", "ORG"),
+    "congress": ("Indian National Congress", "ORG"),
+    "aap": ("Aam Aadmi Party", "ORG"),
+    "shiv sena": ("Shiv Sena", "ORG"),
+    "rss": ("RSS", "ORG"),
+    "isro": ("ISRO", "ORG"),
+    "bcci": ("BCCI", "ORG"),
+    "ipl": ("IPL", "ORG"),
+    "tata": ("Tata Group", "ORG"),
+    "reliance": ("Reliance Industries", "ORG"),
+    "adani": ("Adani Group", "ORG"),
+    "infosys": ("Infosys", "ORG"),
+    "wipro": ("Wipro", "ORG"),
+    "ndtv": ("NDTV", "ORG"),
+    "republic tv": ("Republic TV", "ORG"),
+    "aaj tak": ("Aaj Tak", "ORG"),
+    "zomato": ("Zomato", "ORG"),
+    "swiggy": ("Swiggy", "ORG"),
+    "flipkart": ("Flipkart", "ORG"),
+    "paytm": ("Paytm", "ORG"),
 }
 
 async def fetch_wikipedia_summary(query: str):
@@ -263,8 +342,8 @@ async def generate_context(entities, text=""):
     # Sort entities by priority for news query
     people = [e for e in processed_entities if e["label"] == "PER"]
     orgs = [e for e in processed_entities if e["label"] == "ORG"]
-    locations = [e for e in processed_entities if e["label"] in ["GPE", "LOC"]]
-    others = [e for e in processed_entities if e["label"] not in ["PER", "ORG", "GPE", "LOC"]]
+    locations = [e for e in processed_entities if e["label"] == "LOC"]
+    others = [e for e in processed_entities if e["label"] not in ["PER", "ORG", "LOC"]]
     
     priority_order = people + orgs + locations + others
     

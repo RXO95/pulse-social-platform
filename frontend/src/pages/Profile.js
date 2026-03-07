@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import API from "../api/api";
+import { useAuth } from "../context/AuthContext";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import DarkModeToggle from "../components/DarkModeToggle";
 import BottomNav from "../components/BottomNav";
@@ -23,6 +24,7 @@ export default function Profile() {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const fileInputRef = useRef(null);
+  const { logout } = useAuth();
   const token = localStorage.getItem("token");
   const { darkMode } = useTheme();
   const t = getTheme(darkMode);
@@ -205,16 +207,32 @@ export default function Profile() {
           
           <div style={styles.actionRow}>
             {isOwnProfile ? (
-              <button onClick={openEditModal} style={styles.editBtn}>
-                Edit Profile
-              </button>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button onClick={openEditModal} style={styles.editBtn}>
+                  Edit Profile
+                </button>
+                <button onClick={logout} style={{ ...styles.editBtn, color: "#f4212e", borderColor: "#f4212e" }}>
+                  Logout
+                </button>
+              </div>
             ) : (
-              <button 
-                onClick={handleFollowToggle}
-                style={profile.is_followed_by_user ? styles.unfollowBtn : styles.followBtn}
-              >
-                {profile.is_followed_by_user ? "Following" : "Follow"}
-              </button>
+              <>
+                <button 
+                  onClick={handleFollowToggle}
+                  style={profile.is_followed_by_user ? styles.unfollowBtn : styles.followBtn}
+                >
+                  {profile.is_followed_by_user ? "Following" : "Follow"}
+                </button>
+                <button
+                  onClick={() => navigate(`/messages?userId=${profile.user_id}`)}
+                  style={{ ...styles.editBtn, marginLeft: 8 }}
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ marginRight: 4 }}>
+                    <path d="M1.998 5.5c0-1.381 1.119-2.5 2.5-2.5h15c1.381 0 2.5 1.119 2.5 2.5v13c0 1.381-1.119 2.5-2.5 2.5h-15c-1.381 0-2.5-1.119-2.5-2.5v-13zm2.5-.5c-.276 0-.5.224-.5.5v2.764l8 5.14 8-5.14V5.5c0-.276-.224-.5-.5-.5h-15zm15.5 4.971l-8 5.14-8-5.14V18.5c0 .276.224.5.5.5h15c.276 0 .5-.224.5-.5v-8.529z"/>
+                  </svg>
+                  Message
+                </button>
+              </>
             )}
           </div>
 

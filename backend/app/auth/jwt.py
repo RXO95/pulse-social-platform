@@ -18,3 +18,8 @@ def create_access_token(data: dict):
         algorithm=ALGORITHM
     )
     return encoded_jwt
+
+
+def decode_token(token: str) -> dict:
+    """Decode and verify a JWT. Raises on expiry / bad signature."""
+    return jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])

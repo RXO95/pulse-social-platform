@@ -55,3 +55,22 @@ async def search_posts(q: str, user=Depends(get_current_user)):
             "entities_detected": [],
             "results": []
         }
+
+
+@router.get("/users")
+async def search_users(q: str, user=Depends(get_current_user)):
+    """Search for users by username (prefix / substring match)."""
+    if not q.strip() or len(q.strip()) < 2:
+        return []
+
+    cursor = db.users.find(
+        {"username": {"$regex": q.strip(), "$options": "i"}},
+        {"password_hash": 0},   # never return passwords
+    ).limit(15)
+
+    results = []
+    async for u in cursor:
+        u["_id"] = str(u["_id"])
+        results.append(u)
+
+    return results

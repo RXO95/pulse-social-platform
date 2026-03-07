@@ -20,7 +20,7 @@ async def trending_topics():
     async for post in cursor:
         for ent in post.get("entities", []):
             # We filter for significant labels only
-            if ent.get("label") in ["PER", "ORG", "GPE", "LOC"]:
+            if ent.get("label") in ["PER", "ORG", "LOC"]:
                 entity_data.append((ent["text"], ent["label"]))
 
     # Count occurrences

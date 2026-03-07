@@ -21,7 +21,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#764ba2"
       },
-      "package": "com.pulse.mobile"
+      "package": "com.pulse.mobile",
+      "useNextNotificationsApi": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -34,6 +35,14 @@
           "fonts": [
             "./assets/ionicons.ttf"
           ]
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#764ba2",
+          "defaultChannel": "messages"
         }
       ]
     ],

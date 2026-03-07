@@ -44,7 +44,6 @@ export default function TrendingScreen({ navigation }) {
     switch (label) {
       case "PER": return "person";
       case "ORG": return "business";
-      case "GPE":
       case "LOC": return "location";
       default: return "pricetag";
     }
@@ -54,8 +53,7 @@ export default function TrendingScreen({ navigation }) {
     switch (label) {
       case "PER": return "Person";
       case "ORG": return "Organization";
-      case "GPE": return "Location";
-      case "LOC": return "Place";
+      case "LOC": return "Location";
       default: return "Topic";
     }
   };
@@ -64,7 +62,6 @@ export default function TrendingScreen({ navigation }) {
     switch (label) {
       case "PER": return "#8b5cf6";
       case "ORG": return "#3b82f6";
-      case "GPE":
       case "LOC": return "#10b981";
       default: return "#f59e0b";
     }
