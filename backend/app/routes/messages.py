@@ -17,7 +17,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.auth.dependency import get_current_user
-from app.models.message import MessageCreate, PublicKeyPayload, PushTokenPayload
+from app.models.message import MessageCreate, PublicKeyPayload, PushTokenPayload, ReactionPayload
 from app.services.database import db
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
@@ -319,6 +319,8 @@ async def send_message(
         "iv": payload.iv,
         "ephemeral_key": payload.ephemeral_key,
         "sender_public_key": payload.sender_public_key,
+        "reply_to": payload.reply_to,
+        "reactions": {},
         "read": False,
         "created_at": datetime.now(timezone.utc),
     }
@@ -378,6 +380,105 @@ async def unread_count(user=Depends(get_current_user)):
         "read": False,
     })
     return {"unread": count}
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  DELETE MESSAGE
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@router.delete("/{message_id}")
+async def delete_message(message_id: str, user=Depends(get_current_user)):
+    """Delete a message. Only the sender can delete their own messages."""
+    uid = user["user_id"]
+
+    if not ObjectId.is_valid(message_id):
+        raise HTTPException(400, "Invalid message ID")
+
+    msg = await db.messages.find_one({"_id": ObjectId(message_id)})
+    if not msg:
+        raise HTTPException(404, "Message not found")
+    if msg["sender_id"] != uid:
+        raise HTTPException(403, "You can only delete your own messages")
+
+    await db.messages.delete_one({"_id": ObjectId(message_id)})
+
+    # Notify the other user via WebSocket
+    conv = await db.conversations.find_one({"_id": ObjectId(msg["conversation_id"])})
+    if conv:
+        for pid in conv["participants"]:
+            if pid != uid:
+                ws = _active_connections.get(pid)
+                if ws:
+                    try:
+                        import json as _json
+                        await ws.send_text(_json.dumps({
+                            "type": "message_deleted",
+                            "message_id": message_id,
+                            "conversation_id": msg["conversation_id"],
+                        }))
+                    except Exception:
+                        pass
+
+    return {"ok": True}
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  REACTIONS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@router.post("/{message_id}/react")
+async def react_to_message(
+    message_id: str,
+    payload: ReactionPayload,
+    user=Depends(get_current_user),
+):
+    """Toggle a reaction on a message. Same emoji again = remove it."""
+    uid = user["user_id"]
+
+    if not ObjectId.is_valid(message_id):
+        raise HTTPException(400, "Invalid message ID")
+
+    msg = await db.messages.find_one({"_id": ObjectId(message_id)})
+    if not msg:
+        raise HTTPException(404, "Message not found")
+
+    # Verify user is a participant in the conversation
+    conv = await db.conversations.find_one({"_id": ObjectId(msg["conversation_id"])})
+    if not conv or uid not in conv["participants"]:
+        raise HTTPException(403, "Not a participant")
+
+    reactions = msg.get("reactions", {})  # {user_id: emoji}
+    current = reactions.get(uid)
+
+    if current == payload.emoji:
+        # Toggle off
+        reactions.pop(uid, None)
+    else:
+        reactions[uid] = payload.emoji
+
+    await db.messages.update_one(
+        {"_id": ObjectId(message_id)},
+        {"$set": {"reactions": reactions}},
+    )
+
+    # Notify the other user via WebSocket
+    if conv:
+        for pid in conv["participants"]:
+            if pid != uid:
+                ws = _active_connections.get(pid)
+                if ws:
+                    try:
+                        import json as _json
+                        await ws.send_text(_json.dumps({
+                            "type": "reaction",
+                            "message_id": message_id,
+                            "conversation_id": msg["conversation_id"],
+                            "reactions": reactions,
+                        }))
+                    except Exception:
+                        pass
+
+    return {"reactions": reactions}
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

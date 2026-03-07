@@ -10,6 +10,12 @@ class MessageCreate(BaseModel):
     iv: str                  # Base64-encoded AES-GCM initialisation vector
     ephemeral_key: str = ""  # Optional: sender's ephemeral public key (ECDH)
     sender_public_key: str = ""  # Sender's public key at time of encryption
+    reply_to: Optional[str] = None  # message_id being replied to
+
+
+class ReactionPayload(BaseModel):
+    """Payload for adding/removing a reaction to a message."""
+    emoji: str               # The emoji used for the reaction
 
 
 class MessageInDB(BaseModel):

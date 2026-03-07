@@ -58,6 +58,8 @@ export default function Messages() {
   const [decryptedCache, setDecryptedCache] = useState({}); // msgId → plaintext
   const [showEmoji, setShowEmoji] = useState(false);
   const [typingUser, setTypingUser] = useState(null);       // username of who is typing
+  const [replyTo, setReplyTo] = useState(null);             // { msgId, text, senderUsername }
+  const [infoModal, setInfoModal] = useState(null);         // { timestamp, isMine } for info display
 
   const messagesEndRef = useRef(null);
   const wsRef = useRef(null);
@@ -154,6 +156,14 @@ export default function Messages() {
             }
             scrollToBottom();
             fetchConversations();
+          }
+          if (data.type === "message_deleted") {
+            setMessages((prev) => prev.filter((m) => m._id !== data.message_id));
+          }
+          if (data.type === "reaction") {
+            setMessages((prev) => prev.map((m) =>
+              m._id === data.message_id ? { ...m, reactions: data.reactions } : m
+            ));
           }
           if (data.type === "typing") {
             setTypingUser(data.username || null);
@@ -321,6 +331,7 @@ export default function Messages() {
           ciphertext,
           iv,
           sender_public_key: senderPubKey,
+          reply_to: replyTo?.msgId || null,
         }),
       });
 
@@ -337,6 +348,7 @@ export default function Messages() {
         } catch { /* quota exceeded, ignore */ }
         setMessages((prev) => [...prev, msg]);
         setDraft("");
+        setReplyTo(null);
         scrollToBottom();
         fetchConversations();
       }
@@ -441,6 +453,53 @@ export default function Messages() {
     setDraft((prev) => prev + emoji);
   };
 
+  /* ─── message context menu handlers ─── */
+
+  const handleReply = (msg, plaintext) => {
+    const senderName = msg.sender_id === currentUser?._id ? "You" : activeConv?.other_user?.username;
+    setReplyTo({ msgId: msg._id, text: plaintext, senderUsername: senderName });
+    // Focus the input
+    setTimeout(() => document.querySelector('[data-compose-input]')?.focus(), 100);
+  };
+
+  const handleReact = async (messageId, emoji) => {
+    try {
+      const res = await fetch(`${API}/messages/${messageId}/react`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Update the message's reactions in state
+        setMessages((prev) => prev.map((m) =>
+          m._id === messageId ? { ...m, reactions: data.reactions } : m
+        ));
+      }
+    } catch (err) {
+      console.error("React failed:", err);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId) => {
+    if (!window.confirm("Delete this message?")) return;
+    try {
+      const res = await fetch(`${API}/messages/${messageId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setMessages((prev) => prev.filter((m) => m._id !== messageId));
+      }
+    } catch (err) {
+      console.error("Delete failed:", err);
+    }
+  };
+
+  const handleInfo = (msg, timestamp) => {
+    setInfoModal({ timestamp, isMine: msg.sender_id === currentUser?._id, read: msg.read });
+  };
+
   /* ═══════════════════════ RENDER ═══════════════════════ */
 
   if (isLoading) {
@@ -485,7 +544,7 @@ export default function Messages() {
               <span>Messages are end-to-end encrypted. No one outside of this chat can read them.</span>
             </div>
             {messages.map((msg) => (
-              <MessageBubble key={msg._id} msg={msg} isMine={msg.sender_id === currentUser?._id} getDecryptedText={getDecryptedText} theme={t} />
+              <MessageBubble key={msg._id} msg={{...msg, _replyText: msg.reply_to ? (decryptedCache[msg.reply_to] || null) : null}} isMine={msg.sender_id === currentUser?._id} getDecryptedText={getDecryptedText} theme={t} onReply={handleReply} onReact={handleReact} onDelete={handleDeleteMessage} onInfo={handleInfo} currentUserId={currentUser?._id} />
             ))}
             <div ref={messagesEndRef} />
           </div>
@@ -494,11 +553,21 @@ export default function Messages() {
               <button key={em} style={s.emojiBtn} onClick={() => insertEmoji(em)}>{em}</button>
             ))}</div></div>
           ))}</div>}
+          {/* Reply bar */}
+          {replyTo && (
+            <div style={s.replyBar}>
+              <div style={s.replyBarContent}>
+                <div style={s.replyBarLabel}>Replying to {replyTo.senderUsername}</div>
+                <div style={s.replyBarText}>{replyTo.text}</div>
+              </div>
+              <button style={s.replyBarClose} onClick={() => setReplyTo(null)}>✕</button>
+            </div>
+          )}
           <div style={s.composeBar}>
             <button style={s.emojiToggle} onClick={() => setShowEmoji((v) => !v)}>
               <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? "#1d9bf0" : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
             </button>
-            <input style={s.composeInput} placeholder="Message…" value={draft}
+            <input data-compose-input style={s.composeInput} placeholder="Message…" value={draft}
               onChange={(e) => { setDraft(e.target.value); emitTyping(); }}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               onFocus={() => setShowEmoji(false)} />
@@ -576,7 +645,7 @@ export default function Messages() {
                 <span>Messages are end-to-end encrypted. No one outside of this chat can read them.</span>
               </div>
               {messages.map((msg) => (
-                <MessageBubble key={msg._id} msg={msg} isMine={msg.sender_id === currentUser?._id} getDecryptedText={getDecryptedText} theme={t} />
+                <MessageBubble key={msg._id} msg={{...msg, _replyText: msg.reply_to ? (decryptedCache[msg.reply_to] || null) : null}} isMine={msg.sender_id === currentUser?._id} getDecryptedText={getDecryptedText} theme={t} onReply={handleReply} onReact={handleReact} onDelete={handleDeleteMessage} onInfo={handleInfo} currentUserId={currentUser?._id} />
               ))}
               <div ref={messagesEndRef} />
             </div>
@@ -585,11 +654,21 @@ export default function Messages() {
                 <button key={em} style={s.emojiBtn} onClick={() => insertEmoji(em)}>{em}</button>
               ))}</div></div>
             ))}</div>}
+            {/* Reply bar */}
+            {replyTo && (
+              <div style={s.replyBar}>
+                <div style={s.replyBarContent}>
+                  <div style={s.replyBarLabel}>Replying to {replyTo.senderUsername}</div>
+                  <div style={s.replyBarText}>{replyTo.text}</div>
+                </div>
+                <button style={s.replyBarClose} onClick={() => setReplyTo(null)}>✕</button>
+              </div>
+            )}
             <div style={s.composeBar}>
               <button style={s.emojiToggle} onClick={() => setShowEmoji((v) => !v)}>
                 <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? "#1d9bf0" : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
               </button>
-              <input style={s.composeInput} placeholder="Message…" value={draft}
+              <input data-compose-input style={s.composeInput} placeholder="Message…" value={draft}
                 onChange={(e) => { setDraft(e.target.value); emitTyping(); }}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                 onFocus={() => setShowEmoji(false)} />
@@ -611,6 +690,34 @@ export default function Messages() {
           </div>
         )}
       </div>
+
+      {/* Info Modal */}
+      {infoModal && (
+        <div style={s.infoModalOverlay} onClick={() => setInfoModal(null)}>
+          <div style={s.infoModalContent} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 16px", fontSize: 18, fontWeight: 700, color: t.text }}>Message Info</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 13, color: t.textSecondary, marginBottom: 2 }}>Sent</div>
+                <div style={{ fontSize: 15, color: t.text }}>{infoModal.timestamp}</div>
+              </div>
+              {infoModal.isMine && (
+                <div>
+                  <div style={{ fontSize: 13, color: t.textSecondary, marginBottom: 2 }}>Status</div>
+                  <div style={{ fontSize: 15, color: t.text, display: "flex", alignItems: "center", gap: 6 }}>
+                    {infoModal.read ? (
+                      <><svg viewBox="0 0 24 24" width="16" height="16" fill="#1d9bf0"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z"/></svg> Read</>
+                    ) : (
+                      <><svg viewBox="0 0 24 24" width="16" height="16" fill={t.textSecondary}><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Delivered</>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            <button onClick={() => setInfoModal(null)} style={{ marginTop: 20, width: "100%", padding: "10px", border: "none", borderRadius: 9999, backgroundColor: t.inputBg, color: t.text, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>Close</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -716,10 +823,14 @@ export default function Messages() {
 
 /* ═══════════════════════════════════════════════════════════════════
    MessageBubble — decrypts lazily and shows plaintext
+   Now with WhatsApp-style dropdown context menu
    ═══════════════════════════════════════════════════════════════════ */
 
-function MessageBubble({ msg, isMine, getDecryptedText, theme: t }) {
+function MessageBubble({ msg, isMine, getDecryptedText, theme: t, onReply, onReact, onDelete, onInfo, currentUserId }) {
   const [text, setText] = useState("Decrypting…");
+  const [showMenu, setShowMenu] = useState(false);
+  const [showReactPicker, setShowReactPicker] = useState(false);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -729,31 +840,264 @@ function MessageBubble({ msg, isMine, getDecryptedText, theme: t }) {
     return () => { cancelled = true; };
   }, [msg, getDecryptedText]);
 
+  // Close menu on outside click
+  useEffect(() => {
+    if (!showMenu && !showReactPicker) return;
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setShowMenu(false);
+        setShowReactPicker(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showMenu, showReactPicker]);
+
+  const quickReactEmojis = ["❤️", "😂", "😮", "😢", "🙏", "👍"];
+  const reactions = msg.reactions || {};
+  const reactionEntries = Object.values(reactions);
+  const reactionCounts = {};
+  reactionEntries.forEach(emoji => { reactionCounts[emoji] = (reactionCounts[emoji] || 0) + 1; });
+  const hasReactions = reactionEntries.length > 0;
+
+  // Replied message info
+  const replyText = msg._replyText; // injected by parent
+
+  const fullTimestamp = (() => {
+    if (!msg.created_at) return "";
+    let raw = String(msg.created_at);
+    if (!raw.endsWith("Z") && !raw.includes("+")) raw += "Z";
+    const d = new Date(raw);
+    return d.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
+  })();
+
+  const menuItems = [
+    {
+      label: "Reply",
+      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>,
+      action: () => { onReply(msg, text); setShowMenu(false); },
+    },
+    {
+      label: "React",
+      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>,
+      action: () => { setShowMenu(false); setShowReactPicker(true); },
+    },
+    {
+      label: "Copy",
+      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>,
+      action: () => {
+        navigator.clipboard?.writeText(text).catch(() => {});
+        setShowMenu(false);
+      },
+    },
+    {
+      label: "Info",
+      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>,
+      action: () => { onInfo(msg, fullTimestamp); setShowMenu(false); },
+    },
+  ];
+
+  // Only show delete for own messages
+  if (isMine) {
+    menuItems.push({
+      label: "Delete",
+      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="#f4212e"><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"/></svg>,
+      action: () => { onDelete(msg._id); setShowMenu(false); },
+      danger: true,
+    });
+  }
+
   return (
     <div style={{
       display: "flex",
       justifyContent: isMine ? "flex-end" : "flex-start",
       padding: "2px 16px",
-    }}>
+      position: "relative",
+    }} ref={menuRef}>
       <div style={{
         maxWidth: "75%",
-        padding: "8px 14px",
-        borderRadius: isMine ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-        backgroundColor: isMine ? "#1d9bf0" : (t.cardBg === "#ffffff" ? "#eff3f4" : "#2f3336"),
-        color: isMine ? "#fff" : t.text,
-        fontSize: 15,
-        lineHeight: "1.4",
-        wordBreak: "break-word",
-      }}>
-        {text}
+        position: "relative",
+      }}
+        onMouseEnter={(e) => {
+          const arrow = e.currentTarget.querySelector('[data-menu-arrow]');
+          if (arrow) arrow.style.opacity = "1";
+        }}
+        onMouseLeave={(e) => {
+          const arrow = e.currentTarget.querySelector('[data-menu-arrow]');
+          if (arrow && !showMenu && !showReactPicker) arrow.style.opacity = "0";
+        }}
+      >
+        {/* Dropdown arrow trigger */}
+        <button
+          data-menu-arrow
+          onClick={() => { setShowMenu(!showMenu); setShowReactPicker(false); }}
+          style={{
+            position: "absolute",
+            top: 4,
+            [isMine ? "left" : "right"]: -28,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: 4,
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: 0,
+            transition: "opacity 0.15s, background-color 0.15s",
+            zIndex: 5,
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = t.inputBg}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16" fill={t.textSecondary}><path d="M7 10l5 5 5-5z"/></svg>
+        </button>
+
+        {/* The bubble */}
         <div style={{
-          fontSize: 11,
-          color: isMine ? "rgba(255,255,255,0.6)" : t.textSecondary,
-          marginTop: 4,
-          textAlign: "right",
+          padding: "8px 14px",
+          borderRadius: isMine ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+          backgroundColor: isMine ? "#1d9bf0" : (t.cardBg === "#ffffff" ? "#eff3f4" : "#2f3336"),
+          color: isMine ? "#fff" : t.text,
+          fontSize: 15,
+          lineHeight: "1.4",
+          wordBreak: "break-word",
         }}>
-          {timeAgo(msg.created_at)}
+          {/* Reply quote */}
+          {replyText && (
+            <div style={{
+              padding: "6px 10px",
+              marginBottom: 6,
+              borderRadius: 8,
+              borderLeft: `3px solid ${isMine ? "rgba(255,255,255,0.5)" : t.accentBlue}`,
+              backgroundColor: isMine ? "rgba(255,255,255,0.15)" : (t.cardBg === "#ffffff" ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.08)"),
+              fontSize: 13,
+              color: isMine ? "rgba(255,255,255,0.8)" : t.textSecondary,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              maxWidth: 280,
+            }}>
+              {replyText}
+            </div>
+          )}
+          {text}
+          <div style={{
+            fontSize: 11,
+            color: isMine ? "rgba(255,255,255,0.6)" : t.textSecondary,
+            marginTop: 4,
+            textAlign: "right",
+          }}>
+            {timeAgo(msg.created_at)}
+          </div>
         </div>
+
+        {/* Reactions display */}
+        {hasReactions && (
+          <div style={{
+            display: "flex",
+            gap: 4,
+            marginTop: -8,
+            [isMine ? "justifyContent" : ""]: isMine ? "flex-end" : undefined,
+            paddingLeft: isMine ? 0 : 8,
+            paddingRight: isMine ? 8 : 0,
+          }}>
+            {Object.entries(reactionCounts).map(([emoji, count]) => (
+              <span key={emoji} style={{
+                background: t.cardBg === "#ffffff" ? "#fff" : "#2f3336",
+                border: `1px solid ${t.border}`,
+                borderRadius: 12,
+                padding: "2px 6px",
+                fontSize: 13,
+                cursor: "pointer",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+              }} onClick={() => onReact(msg._id, emoji)}>
+                {emoji}{count > 1 ? ` ${count}` : ""}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Context Menu Dropdown */}
+        {showMenu && (
+          <div style={{
+            position: "absolute",
+            top: 28,
+            [isMine ? "right" : "left"]: 0,
+            backgroundColor: t.cardBg === "#ffffff" ? "#fff" : "#2a2a2a",
+            borderRadius: 12,
+            boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+            minWidth: 180,
+            zIndex: 20,
+            overflow: "hidden",
+            border: `1px solid ${t.border}`,
+          }}>
+            {menuItems.map((item) => (
+              <button
+                key={item.label}
+                onClick={item.action}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 14,
+                  width: "100%",
+                  padding: "12px 16px",
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 15,
+                  color: item.danger ? "#f4212e" : t.text,
+                  fontWeight: item.danger ? "600" : "400",
+                  fontFamily: "inherit",
+                  transition: "background 0.12s",
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = t.inputBg}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Quick React Picker (shown after clicking React in menu) */}
+        {showReactPicker && (
+          <div style={{
+            position: "absolute",
+            top: -48,
+            [isMine ? "right" : "left"]: 0,
+            backgroundColor: t.cardBg === "#ffffff" ? "#fff" : "#2a2a2a",
+            borderRadius: 24,
+            boxShadow: "0 4px 20px rgba(0,0,0,0.25)",
+            padding: "6px 8px",
+            display: "flex",
+            gap: 2,
+            zIndex: 20,
+            border: `1px solid ${t.border}`,
+          }}>
+            {quickReactEmojis.map((emoji) => (
+              <button
+                key={emoji}
+                onClick={() => { onReact(msg._id, emoji); setShowReactPicker(false); }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 24,
+                  padding: "4px 6px",
+                  borderRadius: 8,
+                  transition: "transform 0.12s, background 0.12s",
+                  lineHeight: 1,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.3)"; e.currentTarget.style.backgroundColor = t.inputBg; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1025,6 +1369,64 @@ function getStyles(t, mobile) {
       fontSize: 22, padding: "3px 5px", borderRadius: 8,
       transition: "background 0.12s",
       lineHeight: 1,
+    },
+
+    /* ── Reply bar ── */
+    replyBar: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "8px 16px",
+      backgroundColor: t.headerBg,
+      borderTop: `1px solid ${t.border}`,
+      flexShrink: 0,
+      ...(mobile ? { position: "fixed", bottom: mobile ? 112 : 56, left: 0, right: 0, zIndex: 99 } : {}),
+    },
+    replyBarContent: {
+      flex: 1,
+      borderLeft: `3px solid #1d9bf0`,
+      paddingLeft: 10,
+      overflow: "hidden",
+    },
+    replyBarLabel: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#1d9bf0",
+    },
+    replyBarText: {
+      fontSize: 13,
+      color: t.textSecondary,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    },
+    replyBarClose: {
+      background: "none",
+      border: "none",
+      cursor: "pointer",
+      color: t.textSecondary,
+      fontSize: 16,
+      padding: 6,
+      flexShrink: 0,
+    },
+
+    /* ── Info modal ── */
+    infoModalOverlay: {
+      position: "fixed",
+      top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+    },
+    infoModalContent: {
+      backgroundColor: t.cardBg === "#ffffff" ? "#fff" : "#2a2a2a",
+      borderRadius: 16,
+      padding: 24,
+      minWidth: 280,
+      maxWidth: 360,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
     },
   };
 }
