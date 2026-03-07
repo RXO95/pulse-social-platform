@@ -3,8 +3,8 @@ import styled from 'styled-components';
 import { useTheme, getTheme } from '../context/ThemeContext';
 
 const PostLoader = () => {
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, background } = useTheme();
+  const t = getTheme(darkMode, background);
 
   return (
     <StyledWrapper $bg={t.cardBg} $border={t.border} $shimmer={darkMode ? 'rgba(255,255,255,0.04)' : 'rgba(227,227,227,0.5)'} $lineBg={darkMode ? '#2f3336' : '#eff3f4'}>

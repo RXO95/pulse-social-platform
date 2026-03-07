@@ -14,8 +14,8 @@ export default function FollowList() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
   const token = localStorage.getItem("token");
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, background } = useTheme();
+  const t = getTheme(darkMode, background);
   const mobile = useIsMobile();
   const styles = getStyles(t, mobile);
 

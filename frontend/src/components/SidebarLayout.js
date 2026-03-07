@@ -5,15 +5,16 @@ import { useTheme, getTheme } from "../context/ThemeContext";
 import API from "../api/api";
 import BottomNav from "./BottomNav";
 import DarkModeToggle from "./DarkModeToggle";
+import MatrixBackground from "./MatrixBackground";
 import useIsMobile from "../hooks/useIsMobile";
 
 export default function SidebarLayout() {
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, background } = useTheme();
+  const t = getTheme(darkMode, background);
   const mobile = useIsMobile();
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
+  const { logout } = useAuth(); // eslint-disable-line no-unused-vars
   const token = localStorage.getItem("token");
 
   const [currentUser, setCurrentUser] = useState(null);
@@ -57,6 +58,7 @@ export default function SidebarLayout() {
     if (path === "/trending") return location.pathname === "/trending";
     if (path === "/bookmarks") return location.pathname === "/bookmarks";
     if (path === "/profile") return location.pathname.startsWith("/profile");
+    if (path === "/settings") return location.pathname === "/settings";
     return false;
   };
 
@@ -107,13 +109,25 @@ export default function SidebarLayout() {
         </svg>
       ),
     },
+    {
+      path: "/settings",
+      label: "Settings",
+      icon: (
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+          <path d="M10.54 1.75h2.92l.57 2.56c.83.29 1.59.73 2.24 1.28l2.47-.88 1.46 2.53-1.9 1.68c.1.45.15.92.15 1.38s-.05.93-.15 1.38l1.9 1.68-1.46 2.53-2.47-.88c-.65.55-1.41.99-2.24 1.28l-.57 2.56h-2.92l-.57-2.56c-.83-.29-1.59-.73-2.24-1.28l-2.47.88-1.46-2.53 1.9-1.68c-.1-.45-.15-.92-.15-1.38s.05-.93.15-1.38l-1.9-1.68 1.46-2.53 2.47.88c.65-.55 1.41-.99 2.24-1.28l.57-2.56zM12 15.5c1.93 0 3.5-1.57 3.5-3.5s-1.57-3.5-3.5-3.5-3.5 1.57-3.5 3.5 1.57 3.5 3.5 3.5z"/>
+        </svg>
+      ),
+    },
   ];
+
+  const hasCustomBg = background && background !== "none";
 
   /* ══════════ MOBILE: just Outlet + BottomNav ══════════ */
   if (mobile) {
     return (
-      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: t.bg, color: t.text }}>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", backgroundColor: hasCustomBg ? "transparent" : t.bg, color: t.text, position: "relative" }}>
+        {hasCustomBg && background === "matrix" && <MatrixBackground />}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0, position: "relative", zIndex: 1 }}>
           <Outlet />
         </div>
         <BottomNav currentUser={currentUser} />
@@ -127,10 +141,14 @@ export default function SidebarLayout() {
       height: "100vh",
       display: "flex",
       flexDirection: "row",
-      backgroundColor: t.bg,
+      backgroundColor: hasCustomBg ? "transparent" : t.bg,
       color: t.text,
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+      position: "relative",
     }}>
+      {/* Animated background layer */}
+      {hasCustomBg && background === "matrix" && <MatrixBackground />}
+
       {/* ── Left sidebar nav ── */}
       <nav style={{
         width: 275,
@@ -142,6 +160,14 @@ export default function SidebarLayout() {
         alignItems: "flex-end",
         padding: "0 12px",
         boxSizing: "border-box",
+        position: "relative",
+        zIndex: 1,
+        ...(hasCustomBg && {
+          backdropFilter: "blur(16px) saturate(1.4)",
+          WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+          backgroundColor: "rgba(0,0,0,0.45)",
+          borderRight: "1px solid rgba(255,255,255,0.06)",
+        }),
       }}>
         <div style={{
           width: 232,
@@ -158,7 +184,7 @@ export default function SidebarLayout() {
             onClick={() => navigate("/feed")}
           >
             <img
-              src={darkMode ? "/logo-dark.png" : "/logo-light.png"}
+              src={(darkMode || hasCustomBg) ? "/logo-dark.png" : "/logo-light.png"}
               alt="Pulse"
               style={{ height: 30, width: "auto", objectFit: "contain" }}
             />
@@ -217,31 +243,15 @@ export default function SidebarLayout() {
           {/* Spacer */}
           <div style={{ flex: 1 }} />
 
-          {/* Dark mode toggle + Logout */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 12,
-            padding: "12px 12px",
-          }}>
-            <DarkModeToggle />
-            <button
-              onClick={logout}
-              style={{
-                background: "transparent",
-                border: "none",
-                borderRadius: 9999,
-                padding: "8px 12px",
-                cursor: "pointer",
-                fontSize: 14,
-                fontWeight: 400,
-                color: t.textSecondary,
-                transition: "all 0.2s",
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = t.text)}
-              onMouseLeave={(e) => (e.currentTarget.style.color = t.textSecondary)}
-            >
-              Logout
-            </button>
-          </div>
+          {/* Dark mode toggle — only when default background */}
+          {background === "none" && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "12px 12px",
+            }}>
+              <DarkModeToggle />
+            </div>
+          )}
         </div>
       </nav>
 
@@ -253,6 +263,8 @@ export default function SidebarLayout() {
         minWidth: 0,
         height: "100vh",
         overflow: "hidden",
+        position: "relative",
+        zIndex: 1,
       }}>
         <Outlet />
       </div>

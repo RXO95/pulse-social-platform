@@ -6,8 +6,8 @@ import API from "../api/api";
 export default function BottomNav({ currentUser }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, background } = useTheme();
+  const t = getTheme(darkMode, background);
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Fetch unread message count on mount + every 30s

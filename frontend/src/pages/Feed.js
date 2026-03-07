@@ -9,6 +9,8 @@ import BookmarkButton from "../components/BookmarkButton";
 import PostLoader from "../components/PostLoader";
 import DarkModeToggle from "../components/DarkModeToggle";
 import useIsMobile from "../hooks/useIsMobile";
+import WeatherWidget from "../components/WeatherWidget";
+import NewsWidget from "../components/NewsWidget";
 
 function timeAgo(dateString) {
   if (!dateString) return "";
@@ -26,6 +28,120 @@ function timeAgo(dateString) {
   const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d`;
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+/* ─── Swipeable Widget Carousel ─── */
+function WidgetCarousel({ theme: t }) {
+  const [active, setActive] = useState(0);
+  const scrollRef = useRef(null);
+  const WIDGETS = ["weather", "news"];
+
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const idx = Math.round(el.scrollLeft / el.offsetWidth);
+    setActive(idx);
+  };
+
+  const goTo = (idx) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ left: idx * el.offsetWidth, behavior: "smooth" });
+    setActive(idx);
+  };
+
+  const LABELS = ["🌤️ Weather", "📰 News"];
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      {/* Tab selector with arrows */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "center",
+        gap: 4, marginBottom: 10,
+      }}>
+        {/* Left arrow */}
+        <button
+          onClick={() => goTo(Math.max(0, active - 1))}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            color: active === 0 ? (t.border || "#444") : (t.text || "#fff"),
+            fontSize: 18, padding: "6px 8px", borderRadius: 8,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "color 0.2s",
+          }}
+          aria-label="Previous widget"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
+        </button>
+
+        {/* Tab buttons */}
+        {WIDGETS.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => goTo(i)}
+            style={{
+              padding: "7px 16px",
+              borderRadius: 9999,
+              border: "none",
+              fontSize: 13,
+              fontWeight: active === i ? 700 : 500,
+              cursor: "pointer",
+              background: active === i ? "#1d9bf0" : (t.inputBg || "rgba(255,255,255,0.08)"),
+              color: active === i ? "#fff" : (t.textSecondary || "#888"),
+              transition: "all 0.25s",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {LABELS[i]}
+          </button>
+        ))}
+
+        {/* Right arrow */}
+        <button
+          onClick={() => goTo(Math.min(WIDGETS.length - 1, active + 1))}
+          style={{
+            background: "none", border: "none", cursor: "pointer",
+            color: active === WIDGETS.length - 1 ? (t.border || "#444") : (t.text || "#fff"),
+            fontSize: 18, padding: "6px 8px", borderRadius: 8,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "color 0.2s",
+          }}
+          aria-label="Next widget"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/></svg>
+        </button>
+      </div>
+
+      {/* Scroll-snap container */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="widget-carousel-scroll"
+        style={{
+          display: "flex",
+          overflowX: "auto",
+          scrollSnapType: "x mandatory",
+          scrollbarWidth: "none",
+          msOverflowStyle: "none",
+          WebkitOverflowScrolling: "touch",
+          borderRadius: 16,
+          gap: 0,
+        }}
+      >
+        <style>{`.widget-carousel-scroll::-webkit-scrollbar { display: none; }`}</style>
+        <div style={{
+          flex: "0 0 100%", scrollSnapAlign: "start", minWidth: "100%",
+        }}>
+          <WeatherWidget theme={t} />
+        </div>
+        <div style={{
+          flex: "0 0 100%", scrollSnapAlign: "start", minWidth: "100%",
+        }}>
+          <NewsWidget theme={t} />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function Feed() {
@@ -47,10 +163,11 @@ export default function Feed() {
   const { logout } = useAuth();
   const navigate = useNavigate(); 
   const token = localStorage.getItem("token");
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, background } = useTheme();
+  const t = getTheme(darkMode, background);
   const mobile = useIsMobile();
-  const styles = getStyles(t, mobile);
+  const glass = background && background !== "none";
+  const styles = getStyles(t, mobile, background);
 
   // --- FETCH CURRENT USER ---
   const fetchCurrentUser = async () => {
@@ -432,10 +549,10 @@ export default function Feed() {
               position: "sticky",
               top: 0,
               zIndex: 10,
-              backgroundColor: t.headerBg,
-              backdropFilter: "blur(12px)",
-              WebkitBackdropFilter: "blur(12px)",
-              borderBottom: `1px solid ${t.border}`,
+              backgroundColor: glass ? "rgba(0,0,0,0.6)" : t.headerBg,
+              backdropFilter: glass ? "blur(20px) saturate(1.4)" : "blur(12px)",
+              WebkitBackdropFilter: glass ? "blur(20px) saturate(1.4)" : "blur(12px)",
+              borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`,
             }}>
               <div style={{
                 display: "flex",
@@ -691,7 +808,7 @@ export default function Feed() {
 
         <aside style={styles.sidebar}>
           {/* Search bar – desktop only (like X right sidebar) */}
-          <div style={{ position: "sticky", top: 0, paddingTop: 8, paddingBottom: 12, backgroundColor: t.bg, zIndex: 2 }}>
+          <div style={{ position: "sticky", top: 0, paddingTop: 8, paddingBottom: 12, backgroundColor: glass ? "transparent" : t.bg, zIndex: 2 }}>
             <input 
               type="text"
               placeholder="Search"
@@ -725,16 +842,21 @@ export default function Feed() {
                 </div>
               </>
             ) : (
-              <p style={{ fontSize: "14px", color: t.textSecondary }}>Nothing trending yet...</p>
+              <p style={{ fontSize: "14px", color: t.textSecondary, textAlign: "center", padding: "24px 16px", margin: 0 }}>Nothing trending yet...</p>
             )}
           </div>
+
+          {/* ── Swipeable Widget Carousel ── */}
+          <WidgetCarousel theme={t} />
         </aside>
       </div>
     </div>
   );
 }
 
-function getStyles(t, m) { return {
+function getStyles(t, m, bg) {
+  const glass = bg && bg !== "none";
+  return {
   pageRoot: {
     flex: 1,
     display: "flex",
@@ -838,21 +960,37 @@ function getStyles(t, m) { return {
     paddingBottom: m ? "70px" : "0",
     maxWidth: "600px",
     width: "100%",
-    borderLeft: m ? "none" : `1px solid ${t.border}`,
-    borderRight: m ? "none" : `1px solid ${t.border}`,
+    borderLeft: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`,
+    borderRight: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`,
+    ...(glass && {
+      backdropFilter: "blur(20px) saturate(1.4)",
+      WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+      backgroundColor: "rgba(0,0,0,0.5)",
+    }),
   },
   sidebar: {
     width: "350px",
     padding: "0 24px",
     display: m ? "none" : "block",
     overflowY: "auto",
+    ...(glass && {
+      backdropFilter: "blur(16px) saturate(1.4)",
+      WebkitBackdropFilter: "blur(16px) saturate(1.4)",
+      backgroundColor: "rgba(0,0,0,0.35)",
+      borderLeft: "1px solid rgba(255,255,255,0.06)",
+    }),
   },
   trendingCard: {
-    backgroundColor: t.cardBg,
+    backgroundColor: glass ? "rgba(22,24,28,0.6)" : t.cardBg,
     borderRadius: "16px",
     padding: "12px 0",
     transition: "background-color 0.3s",
-    overflow: "hidden"
+    overflow: "hidden",
+    ...(glass && {
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      border: "1px solid rgba(255,255,255,0.08)",
+    }),
   },
   trendingTitle: { fontSize: "20px", fontWeight: "800", padding: "4px 16px 12px", margin: 0, color: t.text },
   trendingItem: {
@@ -881,7 +1019,7 @@ function getStyles(t, m) { return {
   
   postButton: { backgroundColor: t.accentBlue, color: "#fff", border: "none", padding: m ? "8px 20px" : "10px 24px", borderRadius: "9999px", fontWeight: "700", fontSize: "15px", cursor: "pointer", transition: "all 0.2s" },
   feedList: { display: "flex", flexDirection: "column", gap: "0", paddingBottom: "100px" },
-  postCard: { backgroundColor: t.cardBg, padding: m ? "12px 12px 4px" : "16px 16px 4px", borderBottom: `1px solid ${t.border}`, transition: "background-color 0.15s" },
+  postCard: { backgroundColor: glass ? "rgba(22,24,28,0.5)" : t.cardBg, padding: m ? "12px 12px 4px" : "16px 16px 4px", borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`, transition: "background-color 0.15s" },
   postHeader: { display: "flex", alignItems: "flex-start", marginBottom: "4px" },
   userMeta: { display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1, minWidth: 0, gap: "8px" },
   avatar: { width: m ? "38px" : "40px", height: m ? "38px" : "40px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", marginRight: "12px", fontWeight: "700", color: "#1a1a1a", fontSize: m ? "15px" : "16px", flexShrink: 0 },

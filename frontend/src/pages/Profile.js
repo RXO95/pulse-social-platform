@@ -26,10 +26,10 @@ export default function Profile() {
   const fileInputRef = useRef(null);
   const { logout } = useAuth();
   const token = localStorage.getItem("token");
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, background } = useTheme();
+  const t = getTheme(darkMode, background);
   const mobile = useIsMobile();
-  const styles = getStyles(t, mobile);
+  const styles = getStyles(t, mobile, background);
 
   // Check if viewing own profile
   const isOwnProfile = currentUser && profile && currentUser.username === profile.username;
@@ -373,14 +373,16 @@ export default function Profile() {
   );
 }
 
-function getStyles(t, m) { return {
+function getStyles(t, m, bg) {
+  const glass = bg && bg !== "none";
+  return {
   fullScreenWrapper: { flex: 1, display: "flex", flexDirection: "column", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text },
-  navBar: { height: "53px", backgroundColor: t.headerBg, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", transition: "background-color 0.3s" },
+  navBar: { height: "53px", backgroundColor: glass ? "rgba(0,0,0,0.6)" : t.headerBg, borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: glass ? "blur(20px) saturate(1.4)" : "blur(12px)", WebkitBackdropFilter: glass ? "blur(20px) saturate(1.4)" : "blur(12px)", transition: "background-color 0.3s" },
   navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
   backButton: { background: "none", border: "none", cursor: "pointer", padding: "8px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: t.text, flexShrink: 0 },
-  scrollArea: { flex: 1, overflowY: "auto", paddingBottom: m ? "70px" : "0", maxWidth: m ? "none" : "600px", width: "100%", margin: "0 auto", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
+  scrollArea: { flex: 1, overflowY: "auto", paddingBottom: m ? "70px" : "0", maxWidth: m ? "none" : "600px", width: "100%", margin: "0 auto", borderLeft: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`, borderRight: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`, ...(glass && { backdropFilter: "blur(20px) saturate(1.4)", WebkitBackdropFilter: "blur(20px) saturate(1.4)", backgroundColor: "rgba(0,0,0,0.5)" }) },
   
-  profileHeader: { borderBottom: `1px solid ${t.border}`, paddingBottom: "20px", maxWidth: "600px", margin: "0 auto", width: "100%" },
+  profileHeader: { borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`, paddingBottom: "20px", maxWidth: "600px", margin: "0 auto", width: "100%" },
   coverImage: { height: m ? "130px" : "200px", background: t.coverGradient },
   headerContent: { padding: m ? "0 16px" : "0 20px", marginTop: "-48px", position: "relative" },
   avatarLarge: { width: m ? "82px" : "134px", height: m ? "82px" : "134px", borderRadius: "50%", border: `4px solid ${t.bg}`, backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: m ? "32px" : "52px", fontWeight: "800", color: "#1a1a1a", overflow: "hidden" },
@@ -396,7 +398,7 @@ function getStyles(t, m) { return {
   
   sectionTitle: { padding: "16px 16px 8px", margin: 0, color: t.text, fontSize: "16px", fontWeight: "700", borderBottom: `1px solid ${t.border}` },
   feedList: { display: "flex", flexDirection: "column", gap: "0", padding: "0", maxWidth: "600px", margin: "0 auto", width: "100%" },
-  postCard: { backgroundColor: t.cardBg, borderBottom: `1px solid ${t.border}`, padding: m ? "12px 16px" : "16px 20px", transition: "background-color 0.15s" },
+  postCard: { backgroundColor: glass ? "rgba(22,24,28,0.5)" : t.cardBg, borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`, padding: m ? "12px 16px" : "16px 20px", transition: "background-color 0.15s" },
   postHeader: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" },
   avatarSmall: { width: "32px", height: "32px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", color: "#1a1a1a", flexShrink: 0, overflow: "hidden" },
   username: { fontSize: "15px", fontWeight: "700", color: t.text },

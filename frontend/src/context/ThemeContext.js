@@ -2,22 +2,39 @@ import { createContext, useContext, useState, useEffect } from "react";
 
 const ThemeContext = createContext();
 
+/* Background IDs: "none" | "matrix" | ... (more to come) */
+
 export function ThemeProvider({ children }) {
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem("pulse-dark-mode");
     return saved === "true";
   });
 
+  const [background, setBackground] = useState(() => {
+    return localStorage.getItem("pulse-background") || "none";
+  });
+
   useEffect(() => {
     localStorage.setItem("pulse-dark-mode", darkMode);
-    document.documentElement.style.backgroundColor = darkMode ? "#000000" : "#ffffff";
-    document.body.style.backgroundColor = darkMode ? "#000000" : "#ffffff";
-  }, [darkMode]);
+    if (background === "none") {
+      document.documentElement.style.backgroundColor = darkMode ? "#000000" : "#ffffff";
+      document.body.style.backgroundColor = darkMode ? "#000000" : "#ffffff";
+    }
+  }, [darkMode, background]);
+
+  useEffect(() => {
+    localStorage.setItem("pulse-background", background);
+    if (background !== "none") {
+      // Custom backgrounds always use dark theme colours
+      document.documentElement.style.backgroundColor = "#000000";
+      document.body.style.backgroundColor = "#000000";
+    }
+  }, [background]);
 
   const toggleDarkMode = () => setDarkMode((prev) => !prev);
 
   return (
-    <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
+    <ThemeContext.Provider value={{ darkMode, toggleDarkMode, background, setBackground }}>
       {children}
     </ThemeContext.Provider>
   );
@@ -77,6 +94,17 @@ export const theme = {
   },
 };
 
-export function getTheme(darkMode) {
+export function getTheme(darkMode, background) {
+  // Custom backgrounds → dark tokens with semi-transparent glass surfaces
+  if (background && background !== "none") {
+    return {
+      ...theme.dark,
+      bg: "rgba(0,0,0,0.55)",
+      cardBg: "rgba(16,18,22,0.65)",
+      headerBg: "rgba(0,0,0,0.55)",
+      inputBg: "rgba(32,35,39,0.7)",
+      border: "rgba(255,255,255,0.08)",
+    };
+  }
   return darkMode ? theme.dark : theme.light;
 }
