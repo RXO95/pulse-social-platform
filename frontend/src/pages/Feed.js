@@ -8,6 +8,7 @@ import CommentButton from "../components/CommentButton";
 import BookmarkButton from "../components/BookmarkButton";
 import PostLoader from "../components/PostLoader";
 import DarkModeToggle from "../components/DarkModeToggle";
+import PulseLogo from "../components/PulseLogo";
 import useIsMobile from "../hooks/useIsMobile";
 import WeatherWidget from "../components/WeatherWidget";
 import NewsWidget from "../components/NewsWidget";
@@ -511,7 +512,7 @@ export default function Feed() {
         <header style={styles.header}>
           <div style={styles.headerContent}>
             <div style={styles.logoGroup}>
-              <img src={darkMode ? "/logo-dark.png" : "/logo-light.png"} alt="Pulse" style={styles.logoImage} />
+              <PulseLogo height={28} color={t.text} />
             </div>
             
             <input 
@@ -549,10 +550,10 @@ export default function Feed() {
               position: "sticky",
               top: 0,
               zIndex: 10,
-              backgroundColor: glass ? "rgba(0,0,0,0.6)" : t.headerBg,
-              backdropFilter: glass ? "blur(20px) saturate(1.4)" : "blur(12px)",
-              WebkitBackdropFilter: glass ? "blur(20px) saturate(1.4)" : "blur(12px)",
-              borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`,
+              backgroundColor: glass ? "rgba(255,255,255,0.14)" : t.headerBg,
+              backdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)",
+              WebkitBackdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)",
+              borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.12)" : t.border}`,
             }}>
               <div style={{
                 display: "flex",
@@ -960,12 +961,12 @@ function getStyles(t, m, bg) {
     paddingBottom: m ? "70px" : "0",
     maxWidth: "600px",
     width: "100%",
-    borderLeft: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`,
-    borderRight: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`,
+    borderLeft: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.12)" : t.border}`,
+    borderRight: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.12)" : t.border}`,
     ...(glass && {
-      backdropFilter: "blur(20px) saturate(1.4)",
-      WebkitBackdropFilter: "blur(20px) saturate(1.4)",
-      backgroundColor: "rgba(0,0,0,0.5)",
+      backdropFilter: "blur(40px) saturate(1.8)",
+      WebkitBackdropFilter: "blur(40px) saturate(1.8)",
+      backgroundColor: "rgba(255,255,255,0.1)",
     }),
   },
   sidebar: {
@@ -974,22 +975,22 @@ function getStyles(t, m, bg) {
     display: m ? "none" : "block",
     overflowY: "auto",
     ...(glass && {
-      backdropFilter: "blur(16px) saturate(1.4)",
-      WebkitBackdropFilter: "blur(16px) saturate(1.4)",
-      backgroundColor: "rgba(0,0,0,0.35)",
-      borderLeft: "1px solid rgba(255,255,255,0.06)",
+      backdropFilter: "blur(40px) saturate(1.8)",
+      WebkitBackdropFilter: "blur(40px) saturate(1.8)",
+      backgroundColor: "rgba(255,255,255,0.1)",
+      borderLeft: "1px solid rgba(255,255,255,0.18)",
     }),
   },
   trendingCard: {
-    backgroundColor: glass ? "rgba(22,24,28,0.6)" : t.cardBg,
+    backgroundColor: glass ? "rgba(255,255,255,0.1)" : t.cardBg,
     borderRadius: "16px",
     padding: "12px 0",
     transition: "background-color 0.3s",
     overflow: "hidden",
     ...(glass && {
-      backdropFilter: "blur(12px)",
-      WebkitBackdropFilter: "blur(12px)",
-      border: "1px solid rgba(255,255,255,0.08)",
+      backdropFilter: "blur(24px)",
+      WebkitBackdropFilter: "blur(24px)",
+      border: "1px solid rgba(255,255,255,0.12)",
     }),
   },
   trendingTitle: { fontSize: "20px", fontWeight: "800", padding: "4px 16px 12px", margin: 0, color: t.text },
@@ -1019,7 +1020,7 @@ function getStyles(t, m, bg) {
   
   postButton: { backgroundColor: t.accentBlue, color: "#fff", border: "none", padding: m ? "8px 20px" : "10px 24px", borderRadius: "9999px", fontWeight: "700", fontSize: "15px", cursor: "pointer", transition: "all 0.2s" },
   feedList: { display: "flex", flexDirection: "column", gap: "0", paddingBottom: "100px" },
-  postCard: { backgroundColor: glass ? "rgba(22,24,28,0.5)" : t.cardBg, padding: m ? "12px 12px 4px" : "16px 16px 4px", borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`, transition: "background-color 0.15s" },
+  postCard: { backgroundColor: glass ? "rgba(255,255,255,0.1)" : t.cardBg, padding: m ? "12px 12px 4px" : "16px 16px 4px", borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}`, transition: "background-color 0.15s" },
   postHeader: { display: "flex", alignItems: "flex-start", marginBottom: "4px" },
   userMeta: { display: "flex", alignItems: "center", justifyContent: "space-between", flex: 1, minWidth: 0, gap: "8px" },
   avatar: { width: m ? "38px" : "40px", height: m ? "38px" : "40px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", marginRight: "12px", fontWeight: "700", color: "#1a1a1a", fontSize: m ? "15px" : "16px", flexShrink: 0 },

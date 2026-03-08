@@ -1,9 +1,11 @@
+import { useState, useEffect } from "react";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import useIsMobile from "../hooks/useIsMobile";
 import { useNavigate } from "react-router-dom";
+import API from "../api/api";
 
 /* ═══════════════════════════════════════════════════════════
-   Settings — Theme / Background options
+   Settings — Theme / Background / Wallpaper options
    ═══════════════════════════════════════════════════════════ */
 
 const BACKGROUNDS = [
@@ -11,7 +13,7 @@ const BACKGROUNDS = [
     id: "none",
     label: "Default",
     desc: "Use light / dark mode",
-    preview: null, // uses the toggle instead
+    preview: null,
   },
   {
     id: "matrix",
@@ -20,21 +22,78 @@ const BACKGROUNDS = [
     gradient: "linear-gradient(135deg, #020206 0%, #0a1628 50%, #1a0a2e 100%)",
     previewChars: "अ আ ಅ ঈ ক ಕ",
   },
+  {
+    id: "stars",
+    label: "Starry Night",
+    desc: "Animated twinkling stars on a deep sky",
+    gradient: "radial-gradient(ellipse at bottom, #1b2735 0%, #090a0f 100%)",
+    previewChars: "✨ ⭐ ✨",
+  },
+  {
+    id: "wallpaper",
+    label: "Wallpaper",
+    desc: "Pick a photo wallpaper",
+    gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%)",
+    previewChars: "🖼️",
+  },
+];
+
+const WALLPAPER_CATEGORIES = [
+  { q: "nature landscape", label: "Nature" },
+  { q: "abstract gradient", label: "Abstract" },
+  { q: "ocean beach", label: "Ocean" },
+  { q: "mountain scenic", label: "Mountains" },
+  { q: "city skyline night", label: "City" },
+  { q: "space galaxy", label: "Space" },
+  { q: "forest green", label: "Forest" },
+  { q: "sunset sky", label: "Sunset" },
 ];
 
 export default function Settings() {
-  const { darkMode, toggleDarkMode, background, setBackground } = useTheme();
+  const { darkMode, toggleDarkMode, background, setBackground, wallpaperUrl, setWallpaperUrl } = useTheme();
   const t = getTheme(darkMode, background);
   const m = useIsMobile();
   const navigate = useNavigate();
+  const glass = background && background !== "none";
+
+  const [wallpapers, setWallpapers] = useState([]);
+  const [wpLoading, setWpLoading] = useState(false);
+  const [wpCategory, setWpCategory] = useState("nature landscape");
+  const [showWpPicker, setShowWpPicker] = useState(background === "wallpaper");
 
   const selectBg = (id) => {
     setBackground(id);
     if (id !== "none") {
-      // Custom backgrounds force dark mode colours, so ensure darkMode is true
       if (!darkMode) toggleDarkMode();
     }
+    if (id === "wallpaper") {
+      setShowWpPicker(true);
+      if (!wallpapers.length) fetchWallpapers(wpCategory);
+    } else {
+      setShowWpPicker(false);
+    }
   };
+
+  const fetchWallpapers = async (query) => {
+    setWpLoading(true);
+    try {
+      const res = await fetch(`${API}/widgets/wallpapers?query=${encodeURIComponent(query)}&per_page=18`);
+      if (res.ok) {
+        const data = await res.json();
+        setWallpapers(data.results || []);
+      }
+    } catch {
+      console.error("Failed to load wallpapers");
+    } finally {
+      setWpLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (background === "wallpaper" && !wallpapers.length) {
+      fetchWallpapers(wpCategory);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{
@@ -46,9 +105,9 @@ export default function Settings() {
       <div style={{
         height: 53, display: "flex", alignItems: "center",
         padding: "0 16px", gap: 24,
-        borderBottom: `1px solid ${t.border}`,
-        backgroundColor: t.headerBg,
-        backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.12)" : t.border}`,
+        backgroundColor: glass ? "rgba(255,255,255,0.14)" : t.headerBg,
+        backdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)", WebkitBackdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)",
         position: "sticky", top: 0, zIndex: 10,
       }}>
         {m && (
@@ -68,9 +127,10 @@ export default function Settings() {
       <div style={{
         flex: 1, overflowY: "auto",
         maxWidth: 600, width: "100%",
-        borderLeft: m ? "none" : `1px solid ${t.border}`,
-        borderRight: m ? "none" : `1px solid ${t.border}`,
+        borderLeft: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.12)" : t.border}`,
+        borderRight: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.12)" : t.border}`,
         paddingBottom: m ? 80 : 40,
+        ...(glass && { backdropFilter: "blur(40px) saturate(1.8)", WebkitBackdropFilter: "blur(40px) saturate(1.8)", backgroundColor: "rgba(255,255,255,0.1)" }),
       }}>
         {/* ── Theme section ── */}
         <div style={{ padding: "20px 16px 8px" }}>
@@ -173,10 +233,10 @@ export default function Settings() {
                       </div>
                     ) : (
                       <div style={{
-                        fontSize: 22, letterSpacing: 4,
-                        color: "rgba(80, 180, 255, 0.5)",
-                        fontFamily: '"Noto Sans Devanagari", sans-serif',
-                        textShadow: "0 0 8px rgba(80,180,255,0.3)",
+                        fontSize: bg.id === "stars" ? 28 : 22, letterSpacing: 4,
+                        color: bg.id === "stars" ? "#fff" : "rgba(80, 180, 255, 0.5)",
+                        fontFamily: bg.id === "stars" ? "inherit" : '"Noto Sans Devanagari", sans-serif',
+                        textShadow: bg.id === "stars" ? "0 0 12px rgba(255,255,255,0.6)" : "0 0 8px rgba(80,180,255,0.3)",
                       }}>
                         {bg.previewChars}
                       </div>
@@ -220,8 +280,110 @@ export default function Settings() {
           padding: "8px 16px 24px", fontSize: 13,
           color: t.textSecondary, lineHeight: 1.5,
         }}>
-          Custom backgrounds use dark theme colours to keep content readable. More backgrounds coming soon!
+          Custom backgrounds use dark theme colours with liquid glass effect for readability.
         </div>
+
+        {/* ── Wallpaper picker (expandable) ── */}
+        {showWpPicker && (
+          <div style={{ padding: "0 16px 24px" }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 12 }}>
+              Choose Wallpaper
+            </div>
+
+            {/* Category pills */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+              {WALLPAPER_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.q}
+                  onClick={() => { setWpCategory(cat.q); fetchWallpapers(cat.q); }}
+                  style={{
+                    padding: "6px 14px", borderRadius: 9999, fontSize: 13, fontWeight: 600,
+                    cursor: "pointer", transition: "all 0.2s",
+                    border: "none",
+                    backgroundColor: wpCategory === cat.q ? "#1d9bf0" : (glass ? "rgba(255,255,255,0.1)" : t.inputBg),
+                    color: wpCategory === cat.q ? "#fff" : t.text,
+                  }}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Wallpaper grid */}
+            {wpLoading ? (
+              <div style={{ textAlign: "center", padding: 24, color: t.textSecondary, fontSize: 14 }}>
+                Loading wallpapers...
+              </div>
+            ) : (
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 8,
+              }}>
+                {wallpapers.map((wp) => {
+                  const isSelected = wallpaperUrl === wp.regular;
+                  return (
+                    <div
+                      key={wp.id}
+                      onClick={() => {
+                        setWallpaperUrl(wp.regular);
+                        setBackground("wallpaper");
+                      }}
+                      style={{
+                        position: "relative",
+                        borderRadius: 12,
+                        overflow: "hidden",
+                        cursor: "pointer",
+                        border: `2px solid ${isSelected ? "#1d9bf0" : "transparent"}`,
+                        transition: "border-color 0.2s, transform 0.15s",
+                        transform: isSelected ? "scale(1.03)" : "scale(1)",
+                        aspectRatio: "16/10",
+                      }}
+                    >
+                      <img
+                        src={wp.thumb}
+                        alt={wp.author}
+                        loading="lazy"
+                        style={{
+                          width: "100%", height: "100%",
+                          objectFit: "cover", display: "block",
+                        }}
+                      />
+                      {isSelected && (
+                        <div style={{
+                          position: "absolute", top: 4, right: 4,
+                          width: 20, height: 20, borderRadius: 10,
+                          background: "#1d9bf0", display: "flex",
+                          alignItems: "center", justifyContent: "center",
+                        }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="#fff">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                          </svg>
+                        </div>
+                      )}
+                      {/* Author attribution */}
+                      <div style={{
+                        position: "absolute", bottom: 0, left: 0, right: 0,
+                        background: "linear-gradient(transparent, rgba(0,0,0,0.6))",
+                        padding: "12px 6px 4px", fontSize: 9,
+                        color: "rgba(255,255,255,0.8)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {wp.author}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {wallpapers.length > 0 && (
+              <div style={{ fontSize: 11, color: t.textSecondary, marginTop: 8, textAlign: "center" }}>
+                Wallpapers by <a href="https://wallhaven.cc" target="_blank" rel="noopener noreferrer" style={{ color: t.accentBlue }}>Wallhaven</a>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

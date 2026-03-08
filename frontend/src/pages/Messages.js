@@ -74,7 +74,7 @@ export default function Messages() {
   const { darkMode, background } = useTheme();
   const t = getTheme(darkMode, background);
   const mobile = useIsMobile();
-  const s = getStyles(t, mobile);
+  const s = getStyles(t, mobile, background);
 
   /* ─── bootstrap: register public key + fetch user + conversations ─── */
 
@@ -1108,8 +1108,9 @@ function MessageBubble({ msg, isMine, getDecryptedText, theme: t, onReply, onRea
    Styles (inline, matching existing codebase pattern)
    ═══════════════════════════════════════════════════════════════════ */
 
-function getStyles(t, mobile) {
+function getStyles(t, mobile, bg) {
   const fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+  const glass = bg && bg !== "none";
 
   /* ── Desktop split-pane dimensions ── */
   const sidebarW = 380;
@@ -1137,13 +1138,14 @@ function getStyles(t, mobile) {
       height: "100%",
       display: "flex",
       flexDirection: "column",
-      borderRight: `1px solid ${t.border}`,
+      borderRight: `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`,
       overflow: "hidden",
+      ...(glass && { backdropFilter: "blur(40px) saturate(1.8)", WebkitBackdropFilter: "blur(40px) saturate(1.8)", backgroundColor: "rgba(255,255,255,0.12)" }),
     },
     sidebarHeader: {
       display: "flex", alignItems: "center", gap: 10,
       padding: "14px 16px 10px",
-      borderBottom: `1px solid ${t.border}`,
+      borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.12)" : t.border}`,
     },
     headerBackBtn: {
       background: "none", border: "none", cursor: "pointer",
@@ -1169,6 +1171,7 @@ function getStyles(t, mobile) {
       height: "100%",
       overflow: "hidden",
       position: "relative",
+      ...(glass && { backdropFilter: "blur(40px) saturate(1.8)", WebkitBackdropFilter: "blur(40px) saturate(1.8)", backgroundColor: "rgba(255,255,255,0.1)" }),
     },
 
     /* ── Chat empty state (desktop right pane) ── */
@@ -1275,9 +1278,10 @@ function getStyles(t, mobile) {
     chatHeader: {
       display: "flex", alignItems: "center", gap: 12,
       padding: mobile ? "8px 16px" : "12px 20px",
-      backgroundColor: t.headerBg,
-      borderBottom: `1px solid ${t.border}`,
+      backgroundColor: glass ? "rgba(255,255,255,0.14)" : t.headerBg,
+      borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`,
       flexShrink: 0,
+      ...(glass && { backdropFilter: "blur(40px) saturate(1.8)", WebkitBackdropFilter: "blur(40px) saturate(1.8)" }),
     },
     backBtn: {
       background: "none", border: "none", cursor: "pointer",
@@ -1321,9 +1325,10 @@ function getStyles(t, mobile) {
     composeBar: {
       display: "flex", alignItems: "center", gap: 8,
       padding: "8px 16px",
-      backgroundColor: t.headerBg,
-      borderTop: `1px solid ${t.border}`,
+      backgroundColor: glass ? "rgba(255,255,255,0.14)" : t.headerBg,
+      borderTop: `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`,
       flexShrink: 0,
+      ...(glass && { backdropFilter: "blur(40px) saturate(1.8)", WebkitBackdropFilter: "blur(40px) saturate(1.8)" }),
       ...(mobile ? { position: "fixed", bottom: 56, left: 0, right: 0, zIndex: 100 } : {}),
     },
     emojiToggle: {
@@ -1377,8 +1382,8 @@ function getStyles(t, mobile) {
       alignItems: "center",
       gap: 8,
       padding: "8px 16px",
-      backgroundColor: t.headerBg,
-      borderTop: `1px solid ${t.border}`,
+      backgroundColor: glass ? "rgba(255,255,255,0.1)" : t.headerBg,
+      borderTop: `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`,
       flexShrink: 0,
       ...(mobile ? { position: "fixed", bottom: mobile ? 112 : 56, left: 0, right: 0, zIndex: 99 } : {}),
     },

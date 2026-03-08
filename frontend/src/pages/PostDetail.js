@@ -29,7 +29,7 @@ export default function PostDetail() {
   const { darkMode, background } = useTheme();
   const t = getTheme(darkMode, background);
   const mobile = useIsMobile();
-  const styles = getStyles(t, mobile);
+  const styles = getStyles(t, mobile, background);
 
   // Fetch Post Details
   const fetchPost = async () => {
@@ -448,14 +448,14 @@ export default function PostDetail() {
   );
 }
 
-function getStyles(t, m) { return {
+function getStyles(t, m, bg) { const glass = bg && bg !== "none"; return {
   fullScreenWrapper: { flex: 1, display: "flex", flexDirection: "column", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text },
-  navBar: { height: "53px", backgroundColor: t.headerBg, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", transition: "background-color 0.3s" },
+  navBar: { height: "53px", backgroundColor: glass ? "rgba(255,255,255,0.14)" : t.headerBg, borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)", WebkitBackdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)", transition: "background-color 0.3s" },
   navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
   backButton: { background: "none", border: "none", cursor: "pointer", padding: "8px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: t.text, flexShrink: 0 },
-  scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", padding: m ? "0" : "0", paddingBottom: m ? "70px" : "0", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
+  scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", padding: m ? "0" : "0", paddingBottom: m ? "70px" : "0", borderLeft: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, borderRight: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, ...(glass && { backdropFilter: "blur(40px) saturate(1.8)", WebkitBackdropFilter: "blur(40px) saturate(1.8)", backgroundColor: "rgba(255,255,255,0.1)" }) },
   
-  card: { backgroundColor: t.cardBg, borderBottom: `1px solid ${t.border}`, padding: m ? "16px" : "20px", transition: "background-color 0.3s" },
+  card: { backgroundColor: glass ? "rgba(255,255,255,0.1)" : t.cardBg, borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}`, padding: m ? "16px" : "20px", transition: "background-color 0.3s" },
   header: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" },
   avatar: { width: m ? "40px" : "48px", height: m ? "40px" : "48px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: m ? "16px" : "20px", color: "#1a1a1a", flexShrink: 0 },
   content: { fontSize: m ? "17px" : "23px", lineHeight: "1.35", margin: "8px 0 12px", color: t.text, wordBreak: "break-word" },
@@ -538,7 +538,7 @@ function getStyles(t, m) { return {
     borderTop: `1px solid ${t.border}`
   },
 
-  notesSection: { marginTop: "0", borderTop: `1px solid ${t.border}`, padding: m ? "16px" : "20px" },
+  notesSection: { marginTop: "0", borderTop: `1px solid ${glass ? "rgba(255,255,255,0.1)" : t.border}`, padding: m ? "16px" : "20px" },
   sectionTitle: { fontSize: "18px", fontWeight: "700", marginBottom: "16px", color: t.text },
   inputGroup: { display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" },
   textarea: { padding: "14px", borderRadius: "12px", border: `1px solid ${t.inputBorder}`, resize: "none", height: "64px", fontFamily: "inherit", backgroundColor: t.inputBg, color: t.text, transition: "background-color 0.3s, border-color 0.2s", fontSize: "15px", outline: "none" },

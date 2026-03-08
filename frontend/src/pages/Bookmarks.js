@@ -36,7 +36,7 @@ export default function Bookmarks() {
   const { darkMode, background } = useTheme();
   const t = getTheme(darkMode, background);
   const mobile = useIsMobile();
-  const styles = getStyles(t, mobile);
+  const styles = getStyles(t, mobile, background);
 
   const fetchBookmarks = async () => {
     try {
@@ -209,12 +209,12 @@ export default function Bookmarks() {
   );
 }
 
-function getStyles(t, m) { return {
+function getStyles(t, m, bg) { const glass = bg && bg !== "none"; return {
   fullScreenWrapper: { flex: 1, display: "flex", flexDirection: "column", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text },
-  navBar: { height: "53px", backgroundColor: t.headerBg, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", transition: "background-color 0.3s" },
+  navBar: { height: "53px", backgroundColor: glass ? "rgba(255,255,255,0.14)" : t.headerBg, borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)", WebkitBackdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)", transition: "background-color 0.3s" },
   navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
   backButton: { background: "none", border: "none", cursor: "pointer", padding: "8px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: t.text, flexShrink: 0 },
-  scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", paddingBottom: m ? "70px" : "0", borderLeft: m ? "none" : `1px solid ${t.border}`, borderRight: m ? "none" : `1px solid ${t.border}` },
+  scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", paddingBottom: m ? "70px" : "0", borderLeft: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, borderRight: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, ...(glass && { backdropFilter: "blur(40px) saturate(1.8)", WebkitBackdropFilter: "blur(40px) saturate(1.8)", backgroundColor: "rgba(255,255,255,0.1)" }) },
 
   emptyState: { textAlign: "center", padding: "60px 20px" },
   emptyIcon: { marginBottom: "16px" },
@@ -225,7 +225,7 @@ function getStyles(t, m) { return {
   countBadge: { color: t.textSecondary, fontSize: "14px" },
 
   postsSection: { padding: 0 },
-  postCard: { backgroundColor: t.cardBg, padding: m ? "12px 16px 4px" : "16px 20px 4px", borderBottom: `1px solid ${t.border}`, transition: "background-color 0.15s" },
+  postCard: { backgroundColor: glass ? "rgba(255,255,255,0.1)" : t.cardBg, padding: m ? "12px 16px 4px" : "16px 20px 4px", borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}`, transition: "background-color 0.15s" },
   postHeader: { display: "flex", alignItems: "center", marginBottom: "8px" },
   avatar: { width: "38px", height: "38px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", marginRight: "12px", fontWeight: "700", color: "#1a1a1a", fontSize: "15px", flexShrink: 0 },
   postMeta: { display: "flex", alignItems: "center", gap: "4px" },

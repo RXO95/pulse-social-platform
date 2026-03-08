@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import Loader from "../components/Loader";
 import StarsBackground from "../components/StarsBackground";
+import PulseLogo from "../components/PulseLogo";
 
 export default function Signup() {
   const [username, setUsername] = useState("");
@@ -68,7 +69,7 @@ export default function Signup() {
       <div style={styles.pageWrapper}>
         <div style={styles.signupCard}>
           <div style={styles.brandContainer}>
-            <img src="/logo-light.png" alt="Pulse" style={styles.logoImage} />
+            <div style={styles.logoImage}><PulseLogo height={48} color="#fff" /></div>
             <p style={styles.subtitle}>Create your account and join the conversation.</p>
           </div>
 
@@ -170,11 +171,9 @@ const styles = {
     marginBottom: "35px",
   },
   logoImage: {
-    width: "200px",
-    height: "auto",
-    objectFit: "contain",
+    display: "flex",
+    justifyContent: "center",
     margin: "0 auto 30px",
-    display: "block"
   },
   subtitle: {
     color: "#64748b",

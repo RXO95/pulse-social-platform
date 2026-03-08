@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 
 const ThemeContext = createContext();
 
-/* Background IDs: "none" | "matrix" | ... (more to come) */
+/* Background IDs: "none" | "matrix" | "stars" | "wallpaper" */
 
 export function ThemeProvider({ children }) {
   const [darkMode, setDarkMode] = useState(() => {
@@ -12,6 +12,10 @@ export function ThemeProvider({ children }) {
 
   const [background, setBackground] = useState(() => {
     return localStorage.getItem("pulse-background") || "none";
+  });
+
+  const [wallpaperUrl, setWallpaperUrl] = useState(() => {
+    return localStorage.getItem("pulse-wallpaper-url") || "";
   });
 
   useEffect(() => {
@@ -31,10 +35,14 @@ export function ThemeProvider({ children }) {
     }
   }, [background]);
 
+  useEffect(() => {
+    localStorage.setItem("pulse-wallpaper-url", wallpaperUrl);
+  }, [wallpaperUrl]);
+
   const toggleDarkMode = () => setDarkMode((prev) => !prev);
 
   return (
-    <ThemeContext.Provider value={{ darkMode, toggleDarkMode, background, setBackground }}>
+    <ThemeContext.Provider value={{ darkMode, toggleDarkMode, background, setBackground, wallpaperUrl, setWallpaperUrl }}>
       {children}
     </ThemeContext.Provider>
   );
@@ -95,15 +103,18 @@ export const theme = {
 };
 
 export function getTheme(darkMode, background) {
-  // Custom backgrounds → dark tokens with semi-transparent glass surfaces
+  // Custom backgrounds → "liquid glass" tokens — tinted for white text readability
   if (background && background !== "none") {
     return {
       ...theme.dark,
-      bg: "rgba(0,0,0,0.55)",
-      cardBg: "rgba(16,18,22,0.65)",
-      headerBg: "rgba(0,0,0,0.55)",
-      inputBg: "rgba(32,35,39,0.7)",
-      border: "rgba(255,255,255,0.08)",
+      bg: "rgba(0,0,0,0.35)",
+      cardBg: "rgba(255,255,255,0.12)",
+      headerBg: "rgba(255,255,255,0.1)",
+      inputBg: "rgba(255,255,255,0.14)",
+      border: "rgba(255,255,255,0.18)",
+      text: "#ffffff",
+      textSecondary: "rgba(255,255,255,0.7)",
+      textShadow: "0 1px 3px rgba(0,0,0,0.5)",
     };
   }
   return darkMode ? theme.dark : theme.light;

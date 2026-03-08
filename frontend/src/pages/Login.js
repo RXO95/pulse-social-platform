@@ -4,6 +4,7 @@ import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import Loader from "../components/Loader";
 import StarsBackground from "../components/StarsBackground";
+import PulseLogo from "../components/PulseLogo";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -55,7 +56,7 @@ export default function Login() {
       <div style={styles.pageWrapper}>
         <div style={styles.loginCard}>
           <div style={styles.brandContainer}>
-            <img src="/logo-light.png" alt="Pulse" style={styles.logoImage} />
+            <div style={styles.logoImage}><PulseLogo height={48} color="#fff" /></div>
             <p style={styles.subtitle}>Welcome back! Please login to your account.</p>
           </div>
 
@@ -133,11 +134,9 @@ const styles = {
     marginBottom: "35px",
   },
   logoImage: {
-    width: "200px",
-    height: "auto",
-    objectFit: "contain",
+    display: "flex",
+    justifyContent: "center",
     margin: "0 auto 30px",
-    display: "block"
   },
   appName: {
     fontSize: "32px",

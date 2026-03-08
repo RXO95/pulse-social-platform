@@ -17,7 +17,7 @@ export default function FollowList() {
   const { darkMode, background } = useTheme();
   const t = getTheme(darkMode, background);
   const mobile = useIsMobile();
-  const styles = getStyles(t, mobile);
+  const styles = getStyles(t, mobile, background);
 
   const fetchCurrentUser = async () => {
     try {
@@ -165,7 +165,7 @@ export default function FollowList() {
   );
 }
 
-function getStyles(t, m) { return {
+function getStyles(t, m, bg) { const glass = bg && bg !== "none"; return {
   fullScreenWrapper: { 
     flex: 1, 
     display: "flex", 
@@ -176,15 +176,16 @@ function getStyles(t, m) { return {
   },
   navBar: { 
     height: "53px", 
-    backgroundColor: t.headerBg, 
-    borderBottom: `1px solid ${t.border}`, 
+    backgroundColor: glass ? "rgba(255,255,255,0.14)" : t.headerBg, 
+    borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, 
     display: "flex", 
     alignItems: "center", 
     justifyContent: "center",
     position: "sticky",
     top: 0,
     zIndex: 100,
-    backdropFilter: "blur(12px)"
+    backdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)",
+    WebkitBackdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)"
   },
   navContent: { 
     width: "100%", 
@@ -213,8 +214,9 @@ function getStyles(t, m) { return {
     width: "100%", 
     margin: "0 auto",
     paddingBottom: m ? "70px" : "0",
-    borderLeft: m ? "none" : `1px solid ${t.border}`,
-    borderRight: m ? "none" : `1px solid ${t.border}`
+    borderLeft: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.12)" : t.border}`,
+    borderRight: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.12)" : t.border}`,
+    ...(glass && { backdropFilter: "blur(40px) saturate(1.8)", WebkitBackdropFilter: "blur(40px) saturate(1.8)", backgroundColor: "rgba(255,255,255,0.1)" })
   },
   emptyState: {
     textAlign: "center",
@@ -228,8 +230,9 @@ function getStyles(t, m) { return {
     display: "flex",
     alignItems: "center",
     padding: m ? "12px 16px" : "16px 20px",
-    borderBottom: `1px solid ${t.border}`,
-    gap: "12px"
+    borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.06)" : t.border}`,
+    gap: "12px",
+    ...(glass && { backgroundColor: "rgba(255,255,255,0.08)" })
   },
   avatarSection: {
     cursor: "pointer"
