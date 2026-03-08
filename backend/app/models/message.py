@@ -10,7 +10,9 @@ class MessageCreate(BaseModel):
     iv: str                  # Base64-encoded AES-GCM initialisation vector
     ephemeral_key: str = ""  # Optional: sender's ephemeral public key (ECDH)
     sender_public_key: str = ""  # Sender's public key at time of encryption
+    recipient_public_key: str = ""  # Recipient's public key at time of encryption
     reply_to: Optional[str] = None  # message_id being replied to
+    gif_url: Optional[str] = None   # Tenor GIF URL (not encrypted)
 
 
 class ReactionPayload(BaseModel):
@@ -35,6 +37,12 @@ class ConversationInDB(BaseModel):
     last_message_text: str = ""   # ciphertext preview (still encrypted)
     last_message_at: Optional[datetime] = None
     created_at: datetime
+
+
+class KeyBackupPayload(BaseModel):
+    """Client stores encrypted E2EE key backup. Server cannot decrypt this."""
+    encrypted_backup: str    # Base64 AES-GCM encrypted key pair
+    backup_iv: str           # Base64 initialisation vector
 
 
 class PublicKeyPayload(BaseModel):

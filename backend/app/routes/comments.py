@@ -47,6 +47,7 @@ async def add_community_note(post_id: str, payload: dict, user=Depends(get_curre
         "user_id": user["user_id"],
         "username": user["username"],
         "content": content,
+        "gif_url": payload.get("gif_url"),
         "entities": entities,  # NER entities from comment
         "created_at": datetime.utcnow()
     }

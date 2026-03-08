@@ -5,6 +5,8 @@ import { useTheme, getTheme } from "../context/ThemeContext";
 import LikeButton from "../components/LikeButton";
 import CommentButton from "../components/CommentButton";
 import BookmarkButton from "../components/BookmarkButton";
+import RepostButton from "../components/RepostButton";
+import GifPicker from "../components/GifPicker";
 import DarkModeToggle from "../components/DarkModeToggle";
 
 import Loader from "../components/Loader";
@@ -20,6 +22,8 @@ export default function PostDetail() {
   const [loadError, setLoadError] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [isRegeneratingContext, setIsRegeneratingContext] = useState(false);
+  const [commentGifUrl, setCommentGifUrl] = useState(null);
+  const [showGifPicker, setShowGifPicker] = useState(false);
   
   // --- NEW: Translation State ---
   const [translatedText, setTranslatedText] = useState(null);
@@ -131,23 +135,48 @@ export default function PostDetail() {
 
   // Add a New Comment
   const handleSubmitNote = async () => {
-    if (!newNote.trim()) return;
+    if (!newNote.trim() && !commentGifUrl) return;
     try {
+      const body = { content: newNote };
+      if (commentGifUrl) body.gif_url = commentGifUrl;
       const res = await fetch(`${API}/comments/${postId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ content: newNote })
+        body: JSON.stringify(body)
       });
       
       if (res.ok) {
         setNewNote("");
+        setCommentGifUrl(null);
         fetchNotes(); // Refresh list
       }
     } catch {
       alert("Failed to add comment");
+    }
+  };
+
+  // Handle Repost
+  const handleRepost = async (postId) => {
+    const wasReposted = post.is_reposted_by_user;
+    setPost(prev => ({
+      ...prev,
+      is_reposted_by_user: !wasReposted,
+      repost_count: wasReposted ? (prev.repost_count || 1) - 1 : (prev.repost_count || 0) + 1
+    }));
+    try {
+      await fetch(`${API}/reposts/${postId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch {
+      setPost(prev => ({
+        ...prev,
+        is_reposted_by_user: wasReposted,
+        repost_count: wasReposted ? (prev.repost_count || 0) : (prev.repost_count || 1) - 1
+      }));
     }
   };
 
@@ -374,6 +403,13 @@ export default function PostDetail() {
           </div>
         )}
 
+        {/* --- POST GIF --- */}
+        {post.gif_url && !post.media_url && (
+          <div style={styles.mediaContainer}>
+            <img src={post.gif_url} alt="GIF" style={styles.media} />
+          </div>
+        )}
+
         {/* --- NEW: Translate Button --- */}
         <div 
            style={styles.translateBtn} 
@@ -405,6 +441,12 @@ export default function PostDetail() {
             onClick={() => document.querySelector('textarea')?.focus()}
             count={notes.length}
           />
+          <RepostButton
+            isReposted={post.is_reposted_by_user}
+            count={post.repost_count || 0}
+            onRepost={() => handleRepost(post._id)}
+            onQuote={() => navigate(`/compose?quote=${post._id}`)}
+          />
           <BookmarkButton 
             isBookmarked={post.is_bookmarked}
             onToggle={handleBookmark}
@@ -427,7 +469,16 @@ export default function PostDetail() {
             placeholder="Add a comment..."
             style={styles.textarea}
           />
-          <button onClick={handleSubmitNote} style={styles.postBtn}>Post</button>
+          {commentGifUrl && (
+            <div style={{position: "relative", borderRadius: "12px", overflow: "hidden", maxWidth: "200px", marginBottom: "8px"}}>
+              <img src={commentGifUrl} alt="GIF" style={{width: "100%", borderRadius: "12px"}} />
+              <button onClick={() => setCommentGifUrl(null)} style={{position: "absolute", top: 4, right: 4, background: "rgba(0,0,0,0.7)", color: "#fff", border: "none", borderRadius: "50%", width: 24, height: 24, cursor: "pointer", fontSize: "14px", display: "flex", alignItems: "center", justifyContent: "center"}}>&times;</button>
+            </div>
+          )}
+          <div style={{display: "flex", justifyContent: "space-between", alignItems: "center"}}>
+            <button onClick={() => setShowGifPicker(true)} style={{background: "none", border: `1px solid ${t.border}`, borderRadius: "8px", padding: "6px 10px", color: t.accentBlue, fontWeight: "700", fontSize: "13px", cursor: "pointer"}}>GIF</button>
+            <button onClick={handleSubmitNote} style={styles.postBtn}>Post</button>
+          </div>
         </div>
 
         <div style={styles.notesList}>
@@ -438,12 +489,23 @@ export default function PostDetail() {
                 <small style={{color: t.textSecondary}}>{new Date(note.created_at).toLocaleDateString()}</small>
               </div>
               <p style={{margin:"5px 0", fontSize:"14px", color: t.text}}>{note.content}</p>
+              {note.gif_url && (
+                <img src={note.gif_url} alt="GIF" style={{maxWidth: "200px", borderRadius: "12px", marginTop: "6px"}} />
+              )}
             </div>
           ))}
           {notes.length === 0 && <p style={{color: t.textSecondary, fontStyle:"italic"}}>No comments yet.</p>}
         </div>
       </div>
       </div>
+
+      {showGifPicker && (
+        <GifPicker
+          theme={t}
+          onSelect={(url) => { setCommentGifUrl(url); setShowGifPicker(false); }}
+          onClose={() => setShowGifPicker(false)}
+        />
+      )}
     </div>
   );
 }

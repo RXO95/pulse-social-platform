@@ -1,30 +1,49 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
+import { useTheme, getTheme } from '../context/ThemeContext';
+
+const LIKED_COLOR = '#F4212E'; // True red
 
 const LikeButton = ({ isLiked, onLike, count }) => {
+  const [justClicked, setJustClicked] = useState(false);
+  const timerRef = useRef(null);
+  const { darkMode, background } = useTheme();
+  const t = getTheme(darkMode, background);
+  const defaultColor = t.textSecondary || '#71767b';
+
+  const handleClick = () => {
+    if (!isLiked) {
+      setJustClicked(true);
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setJustClicked(false), 1000);
+    }
+    onLike();
+  };
+
   return (
-    <StyledWrapper>
+    <StyledWrapper $defaultColor={defaultColor}>
       <div className="action-row">
-        <div title="Like" className="heart-container">
-          <input 
-            className="checkbox" 
-            type="checkbox" 
-            checked={isLiked} 
-            onChange={onLike}
-          />
+        <div title="Like" className={`heart-container${isLiked ? ' liked' : ''}${justClicked ? ' animate' : ''}`} onClick={handleClick}>
           <div className="svg-container">
-            <svg xmlns="http://www.w3.org/2000/svg" className="svg-outline" viewBox="0 0 24 24">
-              <path d="M17.5,1.917a6.4,6.4,0,0,0-5.5,3.3,6.4,6.4,0,0,0-5.5-3.3A6.8,6.8,0,0,0,0,8.967c0,4.547,4.786,9.513,8.8,12.88a4.974,4.974,0,0,0,6.4,0C19.214,18.48,24,13.514,24,8.967A6.8,6.8,0,0,0,17.5,1.917Zm-3.585,18.4a2.973,2.973,0,0,1-3.83,0C4.947,16.006,2,11.87,2,8.967a4.8,4.8,0,0,1,4.5-5.05A4.8,4.8,0,0,1,11,8.967a1,1,0,0,0,2,0,4.8,4.8,0,0,1,4.5-5.05A4.8,4.8,0,0,1,22,8.967C22,11.87,19.053,16.006,13.915,20.313Z"></path>
-            </svg>
-            <svg xmlns="http://www.w3.org/2000/svg" className="svg-filled" viewBox="0 0 24 24">
-              <path d="M17.5,1.917a6.4,6.4,0,0,0-5.5,3.3,6.4,6.4,0,0,0-5.5-3.3A6.8,6.8,0,0,0,0,8.967c0,4.547,4.786,9.513,8.8,12.88a4.974,4.974,0,0,0,6.4,0C19.214,18.48,24,13.514,24,8.967A6.8,6.8,0,0,0,17.5,1.917Z"></path>
-            </svg>
-            <svg xmlns="http://www.w3.org/2000/svg" height={100} width={100} className="svg-celebrate">
-              <polygon points="10,10 20,20" /><polygon points="10,50 20,50" /><polygon points="20,80 30,70" /><polygon points="90,10 80,20" /><polygon points="90,50 80,50" /><polygon points="80,80 70,70" />
-            </svg>
+            {isLiked ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" className="svg-filled" viewBox="0 0 24 24">
+                  <path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.98C3.907 4.19 6.043 3 8.399 3c1.837 0 3.238.84 4.1 1.78A5.61 5.61 0 0 1 16.6 3c2.358 0 4.494 1.19 5.617 3.21 1.116 2.06 1.026 4.48-.333 6.98z"></path>
+                </svg>
+                {justClicked && (
+                  <svg xmlns="http://www.w3.org/2000/svg" height={100} width={100} className="svg-celebrate">
+                    <polygon points="10,10 20,20" /><polygon points="10,50 20,50" /><polygon points="20,80 30,70" /><polygon points="90,10 80,20" /><polygon points="90,50 80,50" /><polygon points="80,80 70,70" />
+                  </svg>
+                )}
+              </>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="svg-outline" viewBox="0 0 24 24">
+                <path d="M16.697 5.5c-1.222-.06-2.679.51-3.89 2.16l-.805 1.09-.806-1.09C9.984 6.01 8.526 5.44 7.304 5.5c-1.243.07-2.349.78-2.91 1.91-.552 1.12-.633 2.78.479 4.82 1.074 1.97 3.257 4.27 7.129 6.61 3.87-2.34 6.052-4.64 7.126-6.61 1.111-2.04 1.03-3.7.477-4.82-.56-1.13-1.666-1.84-2.908-1.91zm4.187 7.69c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.98C3.907 4.19 6.043 3 8.399 3c1.837 0 3.238.84 4.1 1.78A5.61 5.61 0 0 1 16.6 3c2.358 0 4.494 1.19 5.617 3.21 1.116 2.06 1.026 4.48-.333 6.98z"></path>
+              </svg>
+            )}
           </div>
         </div>
-        <span className="like-count">{count}</span>
+        <span className="like-count" style={isLiked ? {color: '#F4212E'} : undefined}>{count}</span>
       </div>
     </StyledWrapper>
   );
@@ -34,28 +53,36 @@ const StyledWrapper = styled.div`
   .action-row {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
   }
 
   .like-count {
-    font-size: 14px;
-    font-weight: 600;
-    color: #65676b;
+    font-size: 13px;
+    font-weight: 500;
+    color: ${p => p.$defaultColor};
+    transition: color 0.2s;
+    min-width: 8px;
+  }
+
+  .heart-container.liked ~ .like-count,
+  .heart-container.liked + .like-count {
+    color: ${LIKED_COLOR};
   }
 
   .heart-container {
-    --heart-color: #f91880; /* Twitter Pink */
     position: relative;
-    width: 40px;
-    height: 40px;
-    transition: .3s;
+    width: 35px;
+    height: 35px;
+    transition: .2s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 50%;
+    cursor: pointer;
   }
 
-  .heart-container .checkbox {
-    position: absolute;
-    width: 100%; height: 100%;
-    opacity: 0; z-index: 20;
-    cursor: pointer;
+  .heart-container:hover {
+    background-color: rgba(244, 33, 46, 0.1);
   }
 
   .heart-container .svg-container {
@@ -64,33 +91,45 @@ const StyledWrapper = styled.div`
   }
 
   .heart-container .svg-outline, .heart-container .svg-filled {
-    fill: var(--heart-color);
     position: absolute;
-    width: 24px;
+    width: 20px;
+    height: 20px;
+  }
+
+  .heart-container .svg-outline {
+    fill: ${p => p.$defaultColor};
+    transition: fill 0.2s;
+  }
+
+  .heart-container:hover .svg-outline {
+    fill: ${LIKED_COLOR};
+  }
+
+  .heart-container.liked .like-count {
+    color: ${LIKED_COLOR};
   }
 
   .heart-container .svg-filled {
-    display: none;
-    animation: keyframes-svg-filled 1s;
+    fill: ${LIKED_COLOR};
+  }
+
+  .heart-container.animate .svg-filled {
+    animation: keyframes-svg-filled 0.35s cubic-bezier(0.12, 1.36, 0.82, 1.12);
   }
 
   .heart-container .svg-celebrate {
     position: absolute;
     animation: keyframes-svg-celebrate .5s;
     animation-fill-mode: forwards;
-    display: none;
-    stroke: var(--heart-color);
-    fill: var(--heart-color);
+    stroke: ${LIKED_COLOR};
+    fill: ${LIKED_COLOR};
     stroke-width: 2px;
   }
 
-  .heart-container .checkbox:checked~.svg-container .svg-filled { display: block; }
-  .heart-container .checkbox:checked~.svg-container .svg-celebrate { display: block; }
-
   @keyframes keyframes-svg-filled {
     0% { transform: scale(0); }
-    25% { transform: scale(1.2); }
-    50% { transform: scale(1); filter: brightness(1.5); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
   }
 
   @keyframes keyframes-svg-celebrate {

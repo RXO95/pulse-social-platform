@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
+import { deriveBackupKey, ensureKeys } from "../utils/crypto";
 import Loader from "../components/Loader";
 import StarsBackground from "../components/StarsBackground";
 import PulseLogo from "../components/PulseLogo";
@@ -40,7 +41,25 @@ export default function Login() {
       }
 
       const data = await res.json();
-      login(data.access_token);
+      const token = data.access_token;
+
+      // Decode JWT to get userId for key derivation
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        const userId = payload.user_id;
+
+        // Derive E2EE backup key from password (PBKDF2, 600k iterations)
+        const backupKeyHex = await deriveBackupKey(password, userId);
+        localStorage.setItem("pulse_backup_key", backupKeyHex);
+
+        // Ensure E2EE keys exist (IndexedDB → server backup → generate new)
+        await ensureKeys(token, backupKeyHex);
+      } catch (err) {
+        console.warn("E2EE key setup:", err);
+        // Non-fatal — messaging will still work, just without backup
+      }
+
+      login(token);
       navigate("/feed");
 
     } catch {

@@ -132,3 +132,49 @@ async def get_wallpapers(query: str = "nature landscape", page: int = 1, per_pag
 
     total = data.get("meta", {}).get("total", 0)
     return {"results": results, "total": total}
+
+
+# ── Tenor GIF Search (free, v2 API) ──────────────────────────────
+TENOR_API_KEY = "AIzaSyAyimkuYQYF_FXVALexPuGQctUWRURdCYQ"  # free default key
+
+@router.get("/gifs")
+async def search_gifs(
+    q: str = "trending",
+    limit: int = 20,
+    pos: str = "",
+):
+    """Search Tenor for GIFs. Returns compact results."""
+    import httpx
+    url = "https://tenor.googleapis.com/v2/search"
+    params = {
+        "key": TENOR_API_KEY,
+        "q": q,
+        "limit": min(limit, 50),
+        "media_filter": "tinygif,gif",
+        "contentfilter": "medium",
+    }
+    if pos:
+        params["pos"] = pos
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(url, params=params)
+        if resp.status_code != 200:
+            return {"results": [], "next": ""}
+        data = resp.json()
+
+    results = []
+    for item in data.get("results", []):
+        media = item.get("media_formats", {})
+        tiny = media.get("tinygif", {})
+        full = media.get("gif", {})
+        results.append({
+            "id": item.get("id", ""),
+            "title": item.get("content_description", ""),
+            "preview": tiny.get("url", ""),
+            "url": full.get("url", tiny.get("url", "")),
+            "width": full.get("dims", [0, 0])[0],
+            "height": full.get("dims", [0, 0])[1],
+        })
+
+    return {"results": results, "next": data.get("next", "")}
+

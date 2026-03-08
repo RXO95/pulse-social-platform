@@ -23,6 +23,9 @@ export default function Profile() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
+  const [activeTab, setActiveTab] = useState("posts");
+  const [reposts, setReposts] = useState([]);
+  const [isLoadingReposts, setIsLoadingReposts] = useState(false);
   const fileInputRef = useRef(null);
   const { logout } = useAuth();
   const token = localStorage.getItem("token");
@@ -106,6 +109,24 @@ export default function Profile() {
     }
   };
 
+  // Fetch user reposts
+  const fetchReposts = async () => {
+    setIsLoadingReposts(true);
+    try {
+      const res = await fetch(`${API}/reposts/user/${username}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReposts(data);
+      }
+    } catch {
+      console.error("Failed to load reposts");
+    } finally {
+      setIsLoadingReposts(false);
+    }
+  };
+
   // Open edit modal
   const openEditModal = () => {
     setEditUsername(profile.username || "");
@@ -167,6 +188,7 @@ export default function Profile() {
   useEffect(() => {
     fetchProfile();
     fetchUserPosts();
+    fetchReposts();
     fetchCurrentUser();
   }, [username]);
 
@@ -259,47 +281,91 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* USER POSTS */}
+      {/* TABS */}
+      <div style={styles.tabBar}>
+        <button style={activeTab === "posts" ? styles.tabActive : styles.tab} onClick={() => setActiveTab("posts")}>Posts</button>
+        <button style={activeTab === "reposts" ? styles.tabActive : styles.tab} onClick={() => setActiveTab("reposts")}>Reposts</button>
+      </div>
+
+      {/* TAB CONTENT */}
       <div style={styles.feedList}>
-        <h4 style={styles.sectionTitle}>Posts</h4>
-        {isLoadingPosts ? (
+        {activeTab === "posts" ? (
           <>
-            <PostLoader />
-            <PostLoader />
-          </>
-        ) : posts.length === 0 ? (
-          <p style={{color: t.textSecondary, textAlign: "center", padding: 20}}>No posts yet</p>
-        ) : (
-          posts.map((p) => (
-          <div key={p._id} style={styles.postCard}>
-            <div style={styles.postHeader}>
-              <div style={styles.avatarSmall}>
-                {profile.profile_pic_url ? (
-                  <img src={profile.profile_pic_url} alt="" style={styles.avatarImageSmall} />
-                ) : (
-                  p.username?.charAt(0).toUpperCase()
+            {isLoadingPosts ? (
+              <>
+                <PostLoader />
+                <PostLoader />
+              </>
+            ) : posts.length === 0 ? (
+              <p style={{color: t.textSecondary, textAlign: "center", padding: 20}}>No posts yet</p>
+            ) : (
+              posts.map((p) => (
+              <div key={p._id} style={styles.postCard} onClick={() => navigate(`/post/${p._id}`)}>
+                <div style={styles.postHeader}>
+                  <div style={styles.avatarSmall}>
+                    {profile.profile_pic_url ? (
+                      <img src={profile.profile_pic_url} alt="" style={styles.avatarImageSmall} />
+                    ) : (
+                      p.username?.charAt(0).toUpperCase()
+                    )}
+                  </div>
+                  <strong style={styles.username}>@{p.username}</strong>
+                </div>
+                <p style={styles.postContent}>{p.content}</p>
+                {p.media_url && (
+                  <div style={styles.mediaContainer}>
+                    {p.media_type === "video" ? (
+                      <video src={p.media_url} controls style={styles.mediaVideo} />
+                    ) : (
+                      <img src={p.media_url} alt="Post media" style={styles.mediaImage} />
+                    )}
+                  </div>
                 )}
-              </div>
-              <strong style={styles.username}>@{p.username}</strong>
-            </div>
-            <p style={styles.postContent}>{p.content}</p>
-            {/* Render media if exists */}
-            {p.media_url && (
-              <div style={styles.mediaContainer}>
-                {p.media_type === "video" ? (
-                  <video src={p.media_url} controls style={styles.mediaVideo} />
-                ) : (
-                  <img src={p.media_url} alt="Post media" style={styles.mediaImage} />
+                {p.gif_url && !p.media_url && (
+                  <div style={styles.mediaContainer}>
+                    <img src={p.gif_url} alt="GIF" style={styles.mediaImage} />
+                  </div>
                 )}
+                <div style={styles.entityContainer}>
+                    {p.entities?.map((e, idx) => (
+                      <span key={idx} style={styles.tag}>{e.text}</span>
+                    ))}
+                </div>
               </div>
+            ))
             )}
-            <div style={styles.entityContainer}>
-                {p.entities?.map((e, idx) => (
-                  <span key={idx} style={styles.tag}>{e.text}</span>
-                ))}
-            </div>
-          </div>
-        ))
+          </>
+        ) : (
+          <>
+            {isLoadingReposts ? (
+              <>
+                <PostLoader />
+                <PostLoader />
+              </>
+            ) : reposts.length === 0 ? (
+              <p style={{color: t.textSecondary, textAlign: "center", padding: 20}}>No reposts yet</p>
+            ) : (
+              reposts.map((r) => (
+              <div key={r._id} style={styles.postCard} onClick={() => navigate(`/post/${r.original_post_id}`)}>
+                <div style={{display: "flex", alignItems: "center", gap: 6, color: "#00ba7c", fontSize: 13, fontWeight: 600, marginBottom: 8}}>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="#00ba7c"><path d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"/></svg>
+                  @{r.username} reposted
+                </div>
+                {r.is_quote && r.quote_content && (
+                  <p style={styles.postContent}>{r.quote_content}</p>
+                )}
+                {r.original_post && (
+                  <div style={{...styles.postCard, border: `1px solid ${t.border}`, marginTop: 4, borderRadius: 12}}>
+                    <div style={styles.postHeader}>
+                      <strong style={styles.username}>@{r.original_post.username}</strong>
+                    </div>
+                    <p style={{...styles.postContent, fontSize: 14}}>{r.original_post.content}</p>
+                  </div>
+                )}
+              </div>
+            ))
+            )}
+          </>
         )}
       </div>
       </div>
@@ -398,6 +464,9 @@ function getStyles(t, m, bg) {
   
   sectionTitle: { padding: "16px 16px 8px", margin: 0, color: t.text, fontSize: "16px", fontWeight: "700", borderBottom: `1px solid ${t.border}` },
   feedList: { display: "flex", flexDirection: "column", gap: "0", padding: "0", maxWidth: "600px", margin: "0 auto", width: "100%" },
+  tabBar: { display: "flex", borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}`, maxWidth: "600px", margin: "0 auto", width: "100%" },
+  tab: { flex: 1, padding: "16px 0", background: "none", border: "none", borderBottom: "2px solid transparent", color: t.textSecondary, fontSize: "15px", fontWeight: "600", cursor: "pointer", textAlign: "center", transition: "all 0.2s" },
+  tabActive: { flex: 1, padding: "16px 0", background: "none", border: "none", borderBottom: `2px solid ${t.accentBlue}`, color: t.text, fontSize: "15px", fontWeight: "700", cursor: "pointer", textAlign: "center", transition: "all 0.2s" },
   postCard: { backgroundColor: glass ? "rgba(255,255,255,0.1)" : t.cardBg, borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}`, padding: m ? "12px 16px" : "16px 20px", transition: "background-color 0.15s" },
   postHeader: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" },
   avatarSmall: { width: "32px", height: "32px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", color: "#1a1a1a", flexShrink: 0, overflow: "hidden" },

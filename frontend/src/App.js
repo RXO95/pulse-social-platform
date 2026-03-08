@@ -12,6 +12,7 @@ import Trending from "./pages/Trending";
 import FollowList from "./pages/FollowList";
 import Messages from "./pages/Messages";
 import Settings from "./pages/Settings";
+import Compose from "./pages/Compose";
 import ProtectedRoute from "./components/ProtectedRoute";
 import SidebarLayout from "./components/SidebarLayout";
 
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="/trending" element={<Trending />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/compose" element={<Compose />} />
             <Route path="/profile/:username/:type" element={<FollowList />} />
           </Route>
 

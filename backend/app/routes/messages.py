@@ -17,7 +17,7 @@ from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.auth.dependency import get_current_user
-from app.models.message import MessageCreate, PublicKeyPayload, PushTokenPayload, ReactionPayload
+from app.models.message import MessageCreate, PublicKeyPayload, PushTokenPayload, ReactionPayload, KeyBackupPayload
 from app.services.database import db
 
 router = APIRouter(prefix="/messages", tags=["Messages"])
@@ -69,6 +69,43 @@ async def get_public_key(user_id: str, user=Depends(get_current_user)):
     if not doc:
         raise HTTPException(404, "User has no public key registered")
     return {"user_id": user_id, "public_key": doc["public_key"]}
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  ENCRYPTED KEY BACKUP  (server stores ciphertext it cannot decrypt)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@router.put("/key-backup")
+async def store_key_backup(
+    payload: KeyBackupPayload,
+    user=Depends(get_current_user),
+):
+    """Store the client's encrypted E2EE private key backup.
+    The backup is encrypted client-side with a key derived from the
+    user's password — the server never sees the plaintext private key."""
+    await db.key_backups.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {
+            "user_id": user["user_id"],
+            "encrypted_backup": payload.encrypted_backup,
+            "backup_iv": payload.backup_iv,
+            "updated_at": datetime.now(timezone.utc),
+        }},
+        upsert=True,
+    )
+    return {"message": "Key backup stored"}
+
+
+@router.get("/key-backup")
+async def get_key_backup(user=Depends(get_current_user)):
+    """Retrieve the encrypted E2EE key backup for restoring on a new device."""
+    doc = await db.key_backups.find_one({"user_id": user["user_id"]})
+    if not doc:
+        raise HTTPException(404, "No key backup found")
+    return {
+        "encrypted_backup": doc["encrypted_backup"],
+        "backup_iv": doc["backup_iv"],
+    }
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -319,7 +356,9 @@ async def send_message(
         "iv": payload.iv,
         "ephemeral_key": payload.ephemeral_key,
         "sender_public_key": payload.sender_public_key,
+        "recipient_public_key": payload.recipient_public_key,
         "reply_to": payload.reply_to,
+        "gif_url": payload.gif_url,
         "reactions": {},
         "read": False,
         "created_at": datetime.now(timezone.utc),

@@ -13,7 +13,7 @@ router = APIRouter(prefix="/posts", tags=["Posts"])
 
 
 # Helper function to create post document
-async def _create_post_common(content: str, user: dict, media_url: str = None, media_type: str = None):
+async def _create_post_common(content: str, user: dict, media_url: str = None, media_type: str = None, gif_url: str = None):
     """Common post creation logic"""
     
     # Fetch current username from database (JWT may have stale username after profile update)
@@ -46,7 +46,9 @@ async def _create_post_common(content: str, user: dict, media_url: str = None, m
         "context_data": analysis.get("context_data", {}),
         "media_url": media_url,
         "media_type": media_type,
+        "gif_url": gif_url,
         "likes": 0,
+        "repost_count": 0,
         "created_at": datetime.utcnow()
     }
 
@@ -68,7 +70,7 @@ async def create_post(
     """
     Create a new text-only post (JSON body).
     """
-    return await _create_post_common(post.content, user)
+    return await _create_post_common(post.content, user, gif_url=post.gif_url)
 
 
 @router.post("/with-media")
@@ -151,6 +153,15 @@ async def get_posts(user=Depends(get_current_user)):
             "user_id": user_id
         })
         post["is_bookmarked"] = bool(is_bookmarked)
+
+        # Repost enrichments
+        post["repost_count"] = post.get("repost_count", 0)
+        is_reposted = await db.reposts.find_one({
+            "original_post_id": post_id,
+            "user_id": user_id,
+            "is_quote": False
+        })
+        post["is_reposted_by_user"] = bool(is_reposted)
         
         posts.append(post)
 
@@ -191,6 +202,15 @@ async def get_post_by_id(post_id: str, user=Depends(get_current_user)):
     
     comment_count = await db.comments.count_documents({"post_id": post_id})
     post["comment_count"] = comment_count
+
+    # Repost enrichments
+    post["repost_count"] = post.get("repost_count", 0)
+    is_reposted = await db.reposts.find_one({
+        "original_post_id": post_id,
+        "user_id": user_id,
+        "is_quote": False
+    })
+    post["is_reposted_by_user"] = bool(is_reposted)
     
     return post
 
@@ -265,6 +285,14 @@ async def get_related_posts(entity_text: str, user=Depends(get_current_user)):
         is_bookmarked = await db.bookmarks.find_one({"post_id": post_id, "user_id": user_id})
         post["is_bookmarked"] = bool(is_bookmarked)
         
+        post["repost_count"] = post.get("repost_count", 0)
+        is_reposted = await db.reposts.find_one({
+            "original_post_id": post_id,
+            "user_id": user_id,
+            "is_quote": False
+        })
+        post["is_reposted_by_user"] = bool(is_reposted)
+
         posts.append(post)
     
     return {

@@ -6,6 +6,8 @@ import { useTheme, getTheme } from "../context/ThemeContext";
 import LikeButton from "../components/LikeButton";
 import CommentButton from "../components/CommentButton";
 import BookmarkButton from "../components/BookmarkButton";
+import RepostButton from "../components/RepostButton";
+import GifPicker from "../components/GifPicker";
 import PostLoader from "../components/PostLoader";
 import DarkModeToggle from "../components/DarkModeToggle";
 import PulseLogo from "../components/PulseLogo";
@@ -159,6 +161,8 @@ export default function Feed() {
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaPreview, setMediaPreview] = useState(null);
   const [mediaType, setMediaType] = useState(null);
+  const [gifUrl, setGifUrl] = useState(null);
+  const [showGifPicker, setShowGifPicker] = useState(false);
   const mediaInputRef = useRef(null);
 
   const { logout } = useAuth();
@@ -411,6 +415,43 @@ export default function Feed() {
     }
   };
 
+  // --- HANDLE REPOST ---
+  const handleRepost = async (postId) => {
+    const post = posts.find(p => p._id === postId);
+    if (!post) return;
+    const wasReposted = post.is_reposted_by_user;
+    const oldCount = post.repost_count || 0;
+
+    setPosts(prev => prev.map(p =>
+      p._id === postId
+        ? { ...p, is_reposted_by_user: !wasReposted, repost_count: wasReposted ? oldCount - 1 : oldCount + 1 }
+        : p
+    ));
+
+    try {
+      const res = await fetch(`${API}/reposts/${postId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPosts(prev => prev.map(p =>
+          p._id === postId
+            ? { ...p, is_reposted_by_user: data.reposted, repost_count: data.repost_count }
+            : p
+        ));
+      } else {
+        setPosts(prev => prev.map(p =>
+          p._id === postId ? { ...p, is_reposted_by_user: wasReposted, repost_count: oldCount } : p
+        ));
+      }
+    } catch {
+      setPosts(prev => prev.map(p =>
+        p._id === postId ? { ...p, is_reposted_by_user: wasReposted, repost_count: oldCount } : p
+      ));
+    }
+  };
+
   useEffect(() => {
     fetchPosts();
     fetchTrending();
@@ -472,14 +513,16 @@ export default function Feed() {
           body: formData
         });
       } else {
-        // Use JSON for text-only posts (more compatible)
+        // Use JSON for text-only or GIF posts
+        const payload = { content: content.trim() || " " };
+        if (gifUrl) payload.gif_url = gifUrl;
         res = await fetch(`${API}/posts/`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`
           },
-          body: JSON.stringify({ content: content.trim() })
+          body: JSON.stringify(payload)
         });
       }
       
@@ -490,6 +533,7 @@ export default function Feed() {
       }
       setContent("");
       clearMedia();
+      setGifUrl(null);
       await fetchPosts(false);
       fetchTrending();
       
@@ -605,6 +649,14 @@ export default function Feed() {
                     )}
                   </div>
                 )}
+
+                {/* GIF Preview */}
+                {gifUrl && !mediaPreview && (
+                  <div style={styles.mediaPreviewContainer}>
+                    <button onClick={() => setGifUrl(null)} style={styles.removeMediaBtn}>✕</button>
+                    <img src={gifUrl} alt="GIF" style={styles.mediaPreview} />
+                  </div>
+                )}
                 
                 <div style={styles.buttonContainer}>
                   {/* Media Upload Button */}
@@ -624,10 +676,19 @@ export default function Feed() {
                       <path d="M3 5.5C3 4.119 4.119 3 5.5 3h13C19.881 3 21 4.119 21 5.5v13c0 1.381-1.119 2.5-2.5 2.5h-13C4.119 21 3 19.881 3 18.5v-13zM5.5 5c-.276 0-.5.224-.5.5v9.086l3-3 3 3 5-5 3 3V5.5c0-.276-.224-.5-.5-.5h-13zM19 15.414l-3-3-5 5-3-3-3 3V18.5c0 .276.224.5.5.5h13c.276 0 .5-.224.5-.5v-3.086zM9.75 7C8.784 7 8 7.784 8 8.75s.784 1.75 1.75 1.75 1.75-.784 1.75-1.75S10.716 7 9.75 7z"/>
                     </svg>
                   </button>
+                  <button
+                    onClick={() => setShowGifPicker(true)}
+                    style={styles.mediaBtn}
+                    title="Add GIF"
+                  >
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                      <path d="M3 5.5A2.5 2.5 0 015.5 3h13A2.5 2.5 0 0121 5.5v13a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 18.5v-13zM5.5 5c-.28 0-.5.22-.5.5v13c0 .28.22.5.5.5h13c.28 0 .5-.22.5-.5v-13c0-.28-.22-.5-.5-.5h-13zM8 10h1.5v4H8v-4zm2.5 0H13c.55 0 1 .45 1 1v.5h-1.5v-.25h-1v2.5h1v-.25H14v.5c0 .55-.45 1-1 1h-2.5v-5zm4.5 0h3v1.25h-1.75v.5H18v1.25h-1.75V14H14.5v-4z"/>
+                    </svg>
+                  </button>
                   <button 
                     onClick={createPost} 
-                    style={{...styles.postButton, opacity: (content.trim() || mediaFile) ? 1 : 0.5}}
-                    disabled={!content.trim() && !mediaFile}
+                    style={{...styles.postButton, opacity: (content.trim() || mediaFile || gifUrl) ? 1 : 0.5}}
+                    disabled={!content.trim() && !mediaFile && !gifUrl}
                   >
                     {isPosting ? "Posting..." : "Post"}
                   </button>
@@ -736,6 +797,13 @@ export default function Feed() {
                       </div>
                     )}
 
+                    {/* --- POST GIF --- */}
+                    {p.gif_url && !p.media_url && (
+                      <div style={styles.postMediaContainer} onClick={e => e.stopPropagation()}>
+                        <img src={p.gif_url} alt="GIF" style={styles.postMedia} />
+                      </div>
+                    )}
+
                     {/* --- TRANSLATE BUTTON --- */}
                     <div 
                       style={styles.translateBtn} 
@@ -796,6 +864,12 @@ export default function Feed() {
                     onClick={() => navigate(`/post/${p._id}`)}
                     count={p.comment_count || 0}
                   />
+                  <RepostButton
+                    isReposted={p.is_reposted_by_user}
+                    count={p.repost_count || 0}
+                    onRepost={() => handleRepost(p._id)}
+                    onQuoteRepost={() => navigate(`/compose?quote=${p._id}`)}
+                  />
                   <BookmarkButton 
                     isBookmarked={p.is_bookmarked}
                     onToggle={() => handleBookmark(p._id)}
@@ -851,6 +925,14 @@ export default function Feed() {
           <WidgetCarousel theme={t} />
         </aside>
       </div>
+
+      {showGifPicker && (
+        <GifPicker
+          onSelect={(url) => { setGifUrl(url); setShowGifPicker(false); clearMedia(); }}
+          onClose={() => setShowGifPicker(false)}
+          theme={t}
+        />
+      )}
     </div>
   );
 }

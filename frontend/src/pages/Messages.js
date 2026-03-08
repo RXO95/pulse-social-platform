@@ -3,12 +3,15 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import GifPicker from "../components/GifPicker";
 
 import useIsMobile from "../hooks/useIsMobile";
 import {
   getPublicKeyJwk,
   encryptMessage,
   decryptMessage,
+  ensureKeys,
+  restoreKeys,
 } from "../utils/crypto";
 
 /* ──────────────────────────── helpers ──────────────────────────── */
@@ -60,6 +63,8 @@ export default function Messages() {
   const [typingUser, setTypingUser] = useState(null);       // username of who is typing
   const [replyTo, setReplyTo] = useState(null);             // { msgId, text, senderUsername }
   const [infoModal, setInfoModal] = useState(null);         // { timestamp, isMine } for info display
+  const [msgGifUrl, setMsgGifUrl] = useState(null);
+  const [showGifPicker, setShowGifPicker] = useState(false);
 
   const messagesEndRef = useRef(null);
   const wsRef = useRef(null);
@@ -76,18 +81,14 @@ export default function Messages() {
   const mobile = useIsMobile();
   const s = getStyles(t, mobile, background);
 
-  /* ─── bootstrap: register public key + fetch user + conversations ─── */
+  /* ─── bootstrap: ensure E2EE keys + fetch user + conversations ─── */
 
   useEffect(() => {
     (async () => {
       try {
-        // Register/update our public key on the server
-        const pubKey = await getPublicKeyJwk();
-        await fetch(`${API}/messages/keys`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ public_key: pubKey }),
-        });
+        // Ensure E2EE keys exist (IndexedDB → server backup → generate new)
+        const backupKeyHex = localStorage.getItem("pulse_backup_key");
+        await ensureKeys(token, backupKeyHex);
 
         // Current user
         const meRes = await fetch(`${API}/users/me`, {
@@ -309,7 +310,7 @@ export default function Messages() {
   /* ─── send encrypted message ─── */
 
   const handleSend = async () => {
-    if (!draft.trim() || !activeConv || isSending) return;
+    if ((!draft.trim() && !msgGifUrl) || !activeConv || isSending) return;
 
     const otherUserId = activeConv.other_user.user_id;
 
@@ -320,24 +321,29 @@ export default function Messages() {
 
     setIsSending(true);
     try {
-      const { ciphertext, iv } = await encryptMessage(draft.trim(), recipientKey);
+      const textToSend = draft.trim() || (msgGifUrl ? "sent a GIF" : "");
+      const { ciphertext, iv } = await encryptMessage(textToSend, recipientKey);
       const senderPubKey = await getPublicKeyJwk();
+
+      const body = {
+        recipient_id: otherUserId,
+        ciphertext,
+        iv,
+        sender_public_key: senderPubKey,
+        recipient_public_key: recipientKey,
+        reply_to: replyTo?.msgId || null,
+      };
+      if (msgGifUrl) body.gif_url = msgGifUrl;
 
       const res = await fetch(`${API}/messages/send`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          recipient_id: otherUserId,
-          ciphertext,
-          iv,
-          sender_public_key: senderPubKey,
-          reply_to: replyTo?.msgId || null,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (res.ok) {
         const msg = await res.json();
-        const plaintext = draft.trim();
+        const plaintext = draft.trim() || (msgGifUrl ? "sent a GIF" : "");
         playSend();
         // Cache in memory
         setDecryptedCache((prev) => ({ ...prev, [msg._id]: plaintext }));
@@ -349,6 +355,7 @@ export default function Messages() {
         setMessages((prev) => [...prev, msg]);
         setDraft("");
         setReplyTo(null);
+        setMsgGifUrl(null);
         scrollToBottom();
         fetchConversations();
       }
@@ -377,43 +384,70 @@ export default function Messages() {
         }
       } catch { /* ignore */ }
 
-      // Determine which public key to use for ECDH derivation:
-      // - For received messages: use sender's public key (stored per-message or fetched)
-      // - For sent messages: use recipient's public key
+      // Build a list of candidate public keys to try (most likely first)
       const isMine = msg.sender_id === currentUser?._id;
-      let otherPubKey = null;
+      const candidates = [];
 
-      if (!isMine && msg.sender_public_key) {
-        // Best case: sender's key was stored with the message
-        otherPubKey = msg.sender_public_key;
-      } else if (recipientKey) {
-        // Fallback: use the current key from server (works if keys haven't changed)
-        otherPubKey = recipientKey;
+      if (isMine) {
+        // For messages I sent: need the recipient's key at time of encryption
+        if (msg.recipient_public_key) candidates.push(msg.recipient_public_key);
+        if (recipientKey) candidates.push(recipientKey);
+        if (msg.sender_public_key) candidates.push(msg.sender_public_key); // fallback
+      } else {
+        // For messages I received: need the sender's key at time of encryption
+        if (msg.sender_public_key) candidates.push(msg.sender_public_key);
+        if (recipientKey) candidates.push(recipientKey);
+        if (msg.recipient_public_key) candidates.push(msg.recipient_public_key); // fallback
       }
 
-      if (!otherPubKey) return "[encrypted]";
+      // Deduplicate candidate keys
+      const seen = new Set();
+      const uniqueKeys = candidates.filter((k) => {
+        if (!k || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
 
-      try {
-        const plain = await decryptMessage(msg.ciphertext, msg.iv, otherPubKey);
-        setDecryptedCache((prev) => ({ ...prev, [msg._id]: plain }));
-        // Also persist if it's our own sent message
-        if (isMine) {
-          try { localStorage.setItem(`pulse_dm_${msg._id}`, plain); } catch {}
+      if (uniqueKeys.length === 0) return "[encrypted]";
+
+      // Try each candidate key
+      for (const key of uniqueKeys) {
+        try {
+          const plain = await decryptMessage(msg.ciphertext, msg.iv, key);
+          setDecryptedCache((prev) => ({ ...prev, [msg._id]: plain }));
+          if (isMine) {
+            try { localStorage.setItem(`pulse_dm_${msg._id}`, plain); } catch {}
+          }
+          return plain;
+        } catch {
+          continue; // try next key
         }
-        return plain;
-      } catch {
-        // If per-message key failed, try the server's current key as fallback
-        if (!isMine && msg.sender_public_key && recipientKey && msg.sender_public_key !== recipientKey) {
-          try {
-            const plain = await decryptMessage(msg.ciphertext, msg.iv, recipientKey);
-            setDecryptedCache((prev) => ({ ...prev, [msg._id]: plain }));
-            return plain;
-          } catch { /* both failed */ }
-        }
-        return "[unable to decrypt]";
       }
+
+      // All keys failed — attempt key recovery from server backup, then retry
+      const backupKeyHex = localStorage.getItem("pulse_backup_key");
+      if (backupKeyHex) {
+        try {
+          const restored = await restoreKeys(backupKeyHex, token);
+          if (restored) {
+            // Retry with the first viable key after restoring
+            for (const key of uniqueKeys) {
+              try {
+                const plain = await decryptMessage(msg.ciphertext, msg.iv, key);
+                setDecryptedCache((prev) => ({ ...prev, [msg._id]: plain }));
+                if (isMine) {
+                  try { localStorage.setItem(`pulse_dm_${msg._id}`, plain); } catch {}
+                }
+                return plain;
+              } catch { continue; }
+            }
+          }
+        } catch { /* backup restore failed */ }
+      }
+
+      return "[unable to decrypt]";
     },
-    [recipientKey, decryptedCache, currentUser]
+    [recipientKey, decryptedCache, currentUser, token]
   );
 
   /* ─── user search for starting new conversations ─── */
@@ -563,18 +597,29 @@ export default function Messages() {
               <button style={s.replyBarClose} onClick={() => setReplyTo(null)}>✕</button>
             </div>
           )}
+          {/* GIF preview */}
+          {msgGifUrl && (
+            <div style={{padding: "8px 12px", borderTop: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 8}}>
+              <img src={msgGifUrl} alt="GIF" style={{height: 60, borderRadius: 8}} />
+              <button onClick={() => setMsgGifUrl(null)} style={{background: "none", border: "none", color: t.textSecondary, fontSize: 18, cursor: "pointer"}}>✕</button>
+            </div>
+          )}
           <div style={s.composeBar}>
             <button style={s.emojiToggle} onClick={() => setShowEmoji((v) => !v)}>
               <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? "#1d9bf0" : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+            </button>
+            <button style={{...s.emojiToggle, marginLeft: 0}} onClick={() => setShowGifPicker(true)}>
+              <span style={{fontWeight: 800, fontSize: 13, color: t.textSecondary}}>GIF</span>
             </button>
             <input data-compose-input style={s.composeInput} placeholder="Message…" value={draft}
               onChange={(e) => { setDraft(e.target.value); emitTyping(); }}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               onFocus={() => setShowEmoji(false)} />
-            <button style={{ ...s.sendBtn, opacity: draft.trim() ? 1 : 0.4 }} onClick={handleSend} disabled={isSending || !draft.trim()}>
+            <button style={{ ...s.sendBtn, opacity: (draft.trim() || msgGifUrl) ? 1 : 0.4 }} onClick={handleSend} disabled={isSending || (!draft.trim() && !msgGifUrl)}>
               {isSending ? "…" : <svg viewBox="0 0 24 24" width="20" height="20" fill="#fff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>}
             </button>
           </div>
+          {showGifPicker && <GifPicker theme={t} onSelect={(url) => { setMsgGifUrl(url); setShowGifPicker(false); }} onClose={() => setShowGifPicker(false)} />}
         </div>
       );
     }
@@ -664,15 +709,25 @@ export default function Messages() {
                 <button style={s.replyBarClose} onClick={() => setReplyTo(null)}>✕</button>
               </div>
             )}
+            {/* GIF preview */}
+            {msgGifUrl && (
+              <div style={{padding: "8px 12px", borderTop: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 8}}>
+                <img src={msgGifUrl} alt="GIF" style={{height: 60, borderRadius: 8}} />
+                <button onClick={() => setMsgGifUrl(null)} style={{background: "none", border: "none", color: t.textSecondary, fontSize: 18, cursor: "pointer"}}>✕</button>
+              </div>
+            )}
             <div style={s.composeBar}>
               <button style={s.emojiToggle} onClick={() => setShowEmoji((v) => !v)}>
                 <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? "#1d9bf0" : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+              </button>
+              <button style={{...s.emojiToggle, marginLeft: 0}} onClick={() => setShowGifPicker(true)}>
+                <span style={{fontWeight: 800, fontSize: 13, color: t.textSecondary}}>GIF</span>
               </button>
               <input data-compose-input style={s.composeInput} placeholder="Message…" value={draft}
                 onChange={(e) => { setDraft(e.target.value); emitTyping(); }}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                 onFocus={() => setShowEmoji(false)} />
-              <button style={{ ...s.sendBtn, opacity: draft.trim() ? 1 : 0.4 }} onClick={handleSend} disabled={isSending || !draft.trim()}>
+              <button style={{ ...s.sendBtn, opacity: (draft.trim() || msgGifUrl) ? 1 : 0.4 }} onClick={handleSend} disabled={isSending || (!draft.trim() && !msgGifUrl)}>
                 {isSending ? "…" : <svg viewBox="0 0 24 24" width="20" height="20" fill="#fff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>}
               </button>
             </div>
@@ -718,6 +773,7 @@ export default function Messages() {
           </div>
         </div>
       )}
+      {showGifPicker && <GifPicker theme={t} onSelect={(url) => { setMsgGifUrl(url); setShowGifPicker(false); }} onClose={() => setShowGifPicker(false)} />}
     </div>
   );
 
@@ -981,7 +1037,10 @@ function MessageBubble({ msg, isMine, getDecryptedText, theme: t, onReply, onRea
               {replyText}
             </div>
           )}
-          {text}
+          {msg.gif_url && (
+            <img src={msg.gif_url} alt="GIF" style={{maxWidth: "100%", borderRadius: 10, marginBottom: text && text !== "sent a GIF" ? 6 : 0}} />
+          )}
+          {(!msg.gif_url || (text && text !== "sent a GIF")) && text}
           <div style={{
             fontSize: 11,
             color: isMine ? "rgba(255,255,255,0.6)" : t.textSecondary,

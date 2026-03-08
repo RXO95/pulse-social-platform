@@ -5,6 +5,7 @@ from typing import Optional
 
 class PostCreate(BaseModel):
     content: str
+    gif_url: Optional[str] = None
     # media_url and media_type will be set from file upload
 
 
