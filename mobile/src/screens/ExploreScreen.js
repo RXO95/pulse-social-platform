@@ -35,8 +35,8 @@ export default function ExploreScreen({ navigation }) {
   const [trendLoading, setTrendLoading] = useState(true);
   const [trendRefreshing, setTrendRefreshing] = useState(false);
 
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, accentColor } = useTheme();
+  const t = getTheme(darkMode, accentColor);
 
   const fetchTrending = async () => {
     setTrendLoading(true);
@@ -181,7 +181,7 @@ export default function ExploreScreen({ navigation }) {
           ) : (
             <FlatList
               data={trending}
-              keyExtractor={(item, idx) => `${item.text}-${idx}`}
+              keyExtractor={(item, idx) => `${item.topic || item.text}-${idx}`}
               contentContainerStyle={{ paddingBottom: 16 }}
               refreshControl={
                 <RefreshControl
@@ -208,10 +208,11 @@ export default function ExploreScreen({ navigation }) {
               }
               renderItem={({ item, index }) => {
                 const color = getLabelColor(item.label);
+                const entityName = item.topic || item.text || "Unknown";
                 return (
                   <TouchableOpacity
                     style={[s.trendCard, { backgroundColor: t.cardBg, borderColor: t.border }]}
-                    onPress={() => navigation.navigate("EntityExplore", { entityText: item.text })}
+                    onPress={() => navigation.navigate("EntityExplore", { entityText: entityName })}
                     activeOpacity={0.8}
                   >
                     <View style={s.trendRow}>
@@ -219,7 +220,7 @@ export default function ExploreScreen({ navigation }) {
                         <Text style={[s.rankText, { color }]}>{index + 1}</Text>
                       </View>
                       <View style={{ flex: 1, marginLeft: 12 }}>
-                        <Text style={[s.trendText, { color: t.text }]}>{item.text}</Text>
+                        <Text style={[s.trendText, { color: t.text }]}>{entityName}</Text>
                         <View style={s.trendMeta}>
                           <Ionicons name={getLabelIcon(item.label)} size={14} color={color} />
                           <Text style={[s.trendLabel, { color: t.textSecondary }]}>

@@ -17,8 +17,8 @@ export default function TrendingScreen({ navigation }) {
   const [trending, setTrending] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, accentColor } = useTheme();
+  const t = getTheme(darkMode, accentColor);
 
   const fetchTrending = async () => {
     setIsLoading(true);
@@ -69,10 +69,11 @@ export default function TrendingScreen({ navigation }) {
 
   const renderTrending = ({ item, index }) => {
     const color = getLabelColor(item.label);
+    const entityName = item.topic || item.text || "Unknown";
     return (
       <TouchableOpacity
         style={[styles.trendCard, { backgroundColor: t.cardBg, borderColor: t.border }]}
-        onPress={() => navigation.navigate("EntityExplore", { entityText: item.text })}
+        onPress={() => navigation.navigate("EntityExplore", { entityText: entityName })}
         activeOpacity={0.8}
       >
         <View style={styles.trendRow}>
@@ -80,7 +81,7 @@ export default function TrendingScreen({ navigation }) {
             <Text style={[styles.rankText, { color }]}>{index + 1}</Text>
           </View>
           <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={[styles.trendText, { color: t.text }]}>{item.text}</Text>
+            <Text style={[styles.trendText, { color: t.text }]}>{entityName}</Text>
             <View style={styles.trendMeta}>
               <Ionicons name={getLabelIcon(item.label)} size={14} color={color} />
               <Text style={[styles.trendLabel, { color: t.textSecondary }]}>
@@ -117,7 +118,7 @@ export default function TrendingScreen({ navigation }) {
       ) : (
         <FlatList
           data={trending}
-          keyExtractor={(item, idx) => `${item.text}-${idx}`}
+          keyExtractor={(item, idx) => `${item.topic || item.text}-${idx}`}
           renderItem={renderTrending}
           contentContainerStyle={{ paddingBottom: 16 }}
           refreshControl={

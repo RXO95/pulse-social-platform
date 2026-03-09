@@ -19,8 +19,8 @@ export default function BookmarksScreen({ navigation }) {
   const [bookmarks, setBookmarks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, accentColor } = useTheme();
+  const t = getTheme(darkMode, accentColor);
 
   const fetchBookmarks = async () => {
     try {

@@ -12,10 +12,13 @@ import {
   Platform,
   Linking,
   StyleSheet,
+  Modal,
+  Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import GifPicker from "../components/GifPicker";
 import api from "../api/client";
 import { timeAgo } from "../utils/helpers";
 
@@ -25,6 +28,8 @@ export default function PostDetailScreen({ navigation, route }) {
   const [post, setPost] = useState(null);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
+  const [commentGif, setCommentGif] = useState(null);
+  const [showGifPicker, setShowGifPicker] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegeneratingContext, setIsRegeneratingContext] = useState(false);
 
@@ -32,8 +37,14 @@ export default function PostDetailScreen({ navigation, route }) {
   const [translatedText, setTranslatedText] = useState(null);
   const [showTranslation, setShowTranslation] = useState(false);
 
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  // Repost menu / quote repost state
+  const [showRepostMenu, setShowRepostMenu] = useState(false);
+  const [showQuoteModal, setShowQuoteModal] = useState(false);
+  const [quoteContent, setQuoteContent] = useState("");
+  const [isQuoting, setIsQuoting] = useState(false);
+
+  const { darkMode, accentColor } = useTheme();
+  const t = getTheme(darkMode, accentColor);
 
   const fetchPost = async () => {
     setIsLoading(true);
@@ -79,15 +90,70 @@ export default function PostDetailScreen({ navigation, route }) {
     } catch {}
   };
 
-  const submitComment = async () => {
-    if (!newComment.trim()) return;
+  const handleRepost = async () => {
+    setShowRepostMenu(false);
+    if (!post) return;
+    const wasReposted = post.is_reposted_by_user;
+    setPost((p) => ({
+      ...p,
+      is_reposted_by_user: !wasReposted,
+      repost_count: wasReposted
+        ? (p.repost_count || 1) - 1
+        : (p.repost_count || 0) + 1,
+    }));
     try {
-      await api.post(`/comments/${postId}`, { content: newComment });
+      const res = await api.post(`/reposts/${postId}`);
+      setPost((p) => ({
+        ...p,
+        is_reposted_by_user: res.data.reposted,
+        repost_count: res.data.repost_count,
+      }));
+    } catch {
+      setPost((p) => ({
+        ...p,
+        is_reposted_by_user: wasReposted,
+        repost_count: post.repost_count || 0,
+      }));
+    }
+  };
+
+  const openQuoteRepost = () => {
+    setShowRepostMenu(false);
+    setQuoteContent("");
+    setShowQuoteModal(true);
+  };
+
+  const submitQuoteRepost = async () => {
+    if (!quoteContent.trim()) return;
+    setIsQuoting(true);
+    try {
+      await api.post(`/reposts/${postId}/quote`, { content: quoteContent.trim() });
+      setShowQuoteModal(false);
+      setQuoteContent("");
+      fetchPost();
+    } catch (err) {
+      Alert.alert("Error", err.response?.data?.detail || "Failed to quote repost");
+    } finally {
+      setIsQuoting(false);
+    }
+  };
+
+  const submitComment = async () => {
+    if (!newComment.trim() && !commentGif) return;
+    try {
+      const body = { content: newComment };
+      if (commentGif) body.gif_url = commentGif.url;
+      await api.post(`/comments/${postId}`, body);
       setNewComment("");
+      setCommentGif(null);
       fetchComments();
     } catch {
       Alert.alert("Error", "Failed to add comment");
     }
+  };
+
+  const handleCommentGifSelect = (url, preview) => {
+    setCommentGif({ url, preview });
   };
 
   const handleTranslate = async () => {
@@ -258,7 +324,17 @@ export default function PostDetailScreen({ navigation, route }) {
             {timeAgo(item.created_at)}
           </Text>
         </View>
-        <Text style={[styles.commentContent, { color: t.text }]}>{item.content}</Text>
+        {item.content ? (
+          <Text style={[styles.commentContent, { color: t.text }]}>{item.content}</Text>
+        ) : null}
+        {item.gif_url && (
+          <View style={{ position: "relative", marginTop: 6 }}>
+            <Image source={{ uri: item.gif_url }} style={styles.commentGifImg} resizeMode="cover" />
+            <View style={styles.commentGifBadge}>
+              <Text style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>GIF</Text>
+            </View>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -294,6 +370,15 @@ export default function PostDetailScreen({ navigation, route }) {
 
       {post.media_url && (
         <Image source={{ uri: post.media_url }} style={styles.postMedia} resizeMode="cover" />
+      )}
+
+      {post.gif_url && !post.media_url && (
+        <View style={{ position: "relative", marginBottom: 10 }}>
+          <Image source={{ uri: post.gif_url }} style={styles.postMedia} resizeMode="cover" />
+          <View style={styles.gifPostBadge}>
+            <Text style={styles.gifBadgeText}>GIF</Text>
+          </View>
+        </View>
       )}
 
       {/* Translate button */}
@@ -343,6 +428,17 @@ export default function PostDetailScreen({ navigation, route }) {
             {comments.length}
           </Text>
         </View>
+
+        <TouchableOpacity style={styles.actionBtn} onPress={() => setShowRepostMenu(true)}>
+          <Ionicons
+            name={post.is_reposted_by_user ? "repeat" : "repeat-outline"}
+            size={22}
+            color={post.is_reposted_by_user ? "#00ba7c" : t.textSecondary}
+          />
+          <Text style={[styles.actionCount, { color: post.is_reposted_by_user ? "#00ba7c" : t.textSecondary }]}>
+            {post.repost_count || 0}
+          </Text>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionBtn} onPress={handleBookmark}>
           <Ionicons
@@ -400,22 +496,101 @@ export default function PostDetailScreen({ navigation, route }) {
 
         {/* Comment Input */}
         <View style={[styles.commentInputBar, { backgroundColor: t.cardBg, borderColor: t.border }]}>
-          <TextInput
-            style={[styles.commentInput, { color: t.text, backgroundColor: t.inputBg }]}
-            placeholder="Add a comment…"
-            placeholderTextColor={t.textSecondary}
-            value={newComment}
-            onChangeText={setNewComment}
-          />
-          <TouchableOpacity onPress={submitComment} disabled={!newComment.trim()}>
-            <Ionicons
-              name="send"
-              size={22}
-              color={newComment.trim() ? t.accentBlue : t.textSecondary}
+          {commentGif && (
+            <View style={styles.commentGifPreview}>
+              <Image source={{ uri: commentGif.preview || commentGif.url }} style={styles.commentGifThumb} resizeMode="cover" />
+              <TouchableOpacity style={styles.commentGifRemove} onPress={() => setCommentGif(null)}>
+                <Ionicons name="close-circle" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          )}
+          <View style={styles.commentInputRow}>
+            <TouchableOpacity onPress={() => setShowGifPicker(true)} style={{ padding: 4 }}>
+              <Text style={{ fontSize: 12, fontWeight: "800", color: t.accentBlue, borderWidth: 1.5, borderColor: t.accentBlue, borderRadius: 4, paddingHorizontal: 4, paddingVertical: 1, overflow: "hidden" }}>GIF</Text>
+            </TouchableOpacity>
+            <TextInput
+              style={[styles.commentInput, { color: t.text, backgroundColor: t.inputBg }]}
+              placeholder="Add a comment…"
+              placeholderTextColor={t.textSecondary}
+              value={newComment}
+              onChangeText={setNewComment}
             />
-          </TouchableOpacity>
+            <TouchableOpacity onPress={submitComment} disabled={!newComment.trim() && !commentGif}>
+              <Ionicons
+                name="send"
+                size={22}
+                color={(newComment.trim() || commentGif) ? t.accentBlue : t.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
+
+        {/* GIF Picker for comments */}
+        <GifPicker
+          visible={showGifPicker}
+          onClose={() => setShowGifPicker(false)}
+          onSelect={handleCommentGifSelect}
+          theme={t}
+        />
       </KeyboardAvoidingView>
+
+      {/* Repost menu bottom sheet */}
+      <Modal visible={showRepostMenu} transparent animationType="fade" onRequestClose={() => setShowRepostMenu(false)}>
+        <Pressable style={styles.menuOverlay} onPress={() => setShowRepostMenu(false)}>
+          <View style={[styles.menuSheet, { backgroundColor: t.cardBg }]}>
+            <TouchableOpacity style={styles.menuSheetItem} onPress={handleRepost}>
+              <Ionicons name="repeat" size={20} color="#00ba7c" />
+              <Text style={[styles.menuSheetText, { color: t.text }]}>
+                {post?.is_reposted_by_user ? "Undo Repost" : "Repost"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuSheetItem} onPress={openQuoteRepost}>
+              <Ionicons name="create-outline" size={20} color="#00ba7c" />
+              <Text style={[styles.menuSheetText, { color: t.text }]}>Quote Repost</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.menuSheetItem, { borderBottomWidth: 0 }]} onPress={() => setShowRepostMenu(false)}>
+              <Ionicons name="close" size={20} color={t.textSecondary} />
+              <Text style={[styles.menuSheetText, { color: t.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Quote repost modal */}
+      <Modal visible={showQuoteModal} transparent animationType="slide" onRequestClose={() => setShowQuoteModal(false)}>
+        <View style={[styles.quoteOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+          <View style={[styles.quoteSheet, { backgroundColor: t.cardBg }]}>
+            <View style={styles.quoteHeader}>
+              <Text style={[styles.quoteTitle, { color: t.text }]}>Quote Repost</Text>
+              <TouchableOpacity onPress={() => setShowQuoteModal(false)}>
+                <Ionicons name="close" size={24} color={t.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={[styles.quoteInput, { color: t.text, borderColor: t.border }]}
+              placeholder="Add your thoughts..."
+              placeholderTextColor={t.textSecondary}
+              value={quoteContent}
+              onChangeText={setQuoteContent}
+              multiline
+              maxLength={500}
+            />
+            {post && (
+              <View style={[styles.quotePreview, { borderColor: t.border }]}>
+                <Text style={[styles.quotePreviewUser, { color: t.accent }]}>@{post.username}</Text>
+                <Text style={[styles.quotePreviewText, { color: t.textSecondary }]} numberOfLines={3}>{post.content}</Text>
+              </View>
+            )}
+            <TouchableOpacity
+              style={[styles.quoteSubmitBtn, { opacity: quoteContent.trim() ? 1 : 0.5 }]}
+              onPress={submitQuoteRepost}
+              disabled={!quoteContent.trim() || isQuoting}
+            >
+              <Text style={styles.quoteSubmitText}>{isQuoting ? "Posting..." : "Post"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -566,11 +741,13 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: "center", marginTop: 30 },
 
   commentInputBar: {
-    flexDirection: "row",
-    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderTopWidth: 1,
+  },
+  commentInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 10,
   },
   commentInput: {
@@ -580,4 +757,63 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
   },
+  commentGifPreview: {
+    position: "relative",
+    marginBottom: 8,
+    alignSelf: "flex-start",
+  },
+  commentGifThumb: {
+    width: 80,
+    height: 60,
+    borderRadius: 8,
+  },
+  commentGifRemove: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 9,
+  },
+  commentGifImg: {
+    width: "100%",
+    height: 140,
+    borderRadius: 10,
+  },
+  commentGifBadge: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  gifPostBadge: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  gifBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  menuOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
+  menuSheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 30, paddingTop: 8 },
+  menuSheetItem: { flexDirection: "row", alignItems: "center", paddingVertical: 16, paddingHorizontal: 24, gap: 12, borderBottomWidth: 0.5, borderColor: "rgba(128,128,128,0.2)" },
+  menuSheetText: { fontSize: 16, fontWeight: "600" },
+  quoteOverlay: { flex: 1, justifyContent: "center", alignItems: "center" },
+  quoteSheet: { width: "90%", borderRadius: 16, padding: 20 },
+  quoteHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  quoteTitle: { fontSize: 18, fontWeight: "700" },
+  quoteInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15, minHeight: 80, textAlignVertical: "top", marginBottom: 12 },
+  quotePreview: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 16 },
+  quotePreviewUser: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
+  quotePreviewText: { fontSize: 13 },
+  quoteSubmitBtn: { backgroundColor: "#00ba7c", borderRadius: 20, paddingVertical: 12, alignItems: "center" },
+  quoteSubmitText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });

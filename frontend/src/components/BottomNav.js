@@ -32,6 +32,7 @@ export default function BottomNav({ currentUser }) {
 
   const isActive = (path) => {
     if (path === "/feed") return location.pathname === "/feed";
+    if (path === "/notifications") return location.pathname === "/notifications";
     if (path === "/messages") return location.pathname === "/messages";
     if (path === "/trending") return location.pathname === "/trending";
     if (path === "/bookmarks") return location.pathname === "/bookmarks";
@@ -49,6 +50,19 @@ export default function BottomNav({ currentUser }) {
             <path d="M12 1.696L.622 8.807l1.06 1.696L3 9.679V19.5C3 20.881 4.119 22 5.5 22h13c1.381 0 2.5-1.119 2.5-2.5V9.679l1.318.824 1.06-1.696L12 1.696zM12 16.5c-1.933 0-3.5-1.567-3.5-3.5s1.567-3.5 3.5-3.5 3.5 1.567 3.5 3.5-1.567 3.5-3.5 3.5z"/>
           ) : (
             <path d="M12 9c-2.209 0-4 1.791-4 4s1.791 4 4 4 4-1.791 4-4-1.791-4-4-4zm0 6c-1.105 0-2-.895-2-2s.895-2 2-2 2 .895 2 2-.895 2-2 2zm0-13.304L.622 8.807l1.06 1.696L3 9.679V19.5C3 20.881 4.119 22 5.5 22h13c1.381 0 2.5-1.119 2.5-2.5V9.679l1.318.824 1.06-1.696L12 1.696zM19 19.5c0 .276-.224.5-.5.5h-13c-.276 0-.5-.224-.5-.5V8.429l7-4.375 7 4.375V19.5z"/>
+          )}
+        </svg>
+      )
+    },
+    {
+      path: "/notifications",
+      label: "Alerts",
+      icon: (active) => (
+        <svg viewBox="0 0 24 24" width="24" height="24" fill={active ? t.accentBlue : t.textSecondary}>
+          {active ? (
+            <path d="M11.996 2c-4.062 0-7.49 3.021-7.999 7.051L2.866 18H7.1c.463 2.282 2.481 4 4.9 4s4.437-1.718 4.9-4h4.236l-1.143-8.958C19.48 5.017 16.054 2 11.996 2zM9.171 18h5.658c-.412 1.165-1.523 2-2.829 2s-2.417-.835-2.829-2z"/>
+          ) : (
+            <path d="M19.993 9.042C19.48 5.017 16.054 2 11.996 2s-7.49 3.021-7.998 7.051L2.866 18H7.1c.463 2.282 2.481 4 4.9 4s4.437-1.718 4.9-4h4.236l-1.143-8.958zM14.829 18H9.171c.412-1.165 1.523-2 2.829-2s2.417.835 2.829 2zM6.004 9.25C6.39 6.225 8.88 4 11.996 4s5.606 2.225 5.992 5.25L18.87 16H5.13l.874-6.75z"/>
           )}
         </svg>
       )

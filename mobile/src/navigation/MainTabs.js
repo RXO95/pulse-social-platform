@@ -7,8 +7,10 @@ import {
   StyleSheet,
   AppState,
   Text,
+  Image,
 } from "react-native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import PagerView from "react-native-pager-view";
+import { NavigationContainer, NavigationIndependentTree } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme, getTheme } from "../context/ThemeContext";
@@ -27,65 +29,166 @@ import EntityExploreScreen from "../screens/EntityExploreScreen";
 import FollowListScreen from "../screens/FollowListScreen";
 import ConversationsScreen from "../screens/ConversationsScreen";
 import ChatScreen from "../screens/ChatScreen";
+import TrendingScreen from "../screens/TrendingScreen";
+import SettingsScreen from "../screens/SettingsScreen";
+import NotificationsScreen from "../screens/NotificationsScreen";
 
-const Tab = createBottomTabNavigator();
 const FeedStackNav = createNativeStackNavigator();
 const ExploreStackNav = createNativeStackNavigator();
 const MessagesStackNav = createNativeStackNavigator();
 const ProfileStackNav = createNativeStackNavigator();
 
+const TABS = [
+  { key: "Home",     iconFilled: "home",        iconOutline: "home-outline" },
+  { key: "Explore",  iconFilled: "compass",     iconOutline: "compass-outline" },
+  { key: "Messages", iconFilled: "chatbubbles", iconOutline: "chatbubbles-outline" },
+  { key: "Profile",  iconFilled: "person",      iconOutline: "person-outline" },
+];
+
+const { width: SW } = Dimensions.get("window");
+
 // ─── Nested stacks ───
-function FeedStack() {
+// Each stack reports its depth so the PagerView can disable swipe
+// when the user is deep inside a stack (e.g. PostDetail).
+
+function FeedStack({ onDepthChange }) {
   return (
-    <FeedStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <FeedStackNav.Screen name="FeedHome" component={FeedScreen} />
-      <FeedStackNav.Screen name="PostDetail" component={PostDetailScreen} />
-      <FeedStackNav.Screen name="EntityExplore" component={EntityExploreScreen} />
-      <FeedStackNav.Screen name="Profile" component={ProfileScreen} />
-      <FeedStackNav.Screen name="FollowList" component={FollowListScreen} />
-      <FeedStackNav.Screen name="Bookmarks" component={BookmarksScreen} />
-    </FeedStackNav.Navigator>
+    <NavigationIndependentTree>
+    <NavigationContainer>
+      <FeedStackNav.Navigator
+        screenOptions={{ headerShown: false }}
+        screenListeners={{
+          state: (e) => {
+            onDepthChange?.(e.data?.state?.routes?.length ?? 1);
+          },
+        }}
+      >
+        <FeedStackNav.Screen name="FeedHome" component={FeedScreen} />
+        <FeedStackNav.Screen name="PostDetail" component={PostDetailScreen} />
+        <FeedStackNav.Screen name="EntityExplore" component={EntityExploreScreen} />
+        <FeedStackNav.Screen name="Profile" component={ProfileScreen} />
+        <FeedStackNav.Screen name="FollowList" component={FollowListScreen} />
+        <FeedStackNav.Screen name="Bookmarks" component={BookmarksScreen} />
+        <FeedStackNav.Screen name="Trending" component={TrendingScreen} />
+        <FeedStackNav.Screen name="Settings" component={SettingsScreen} />
+        <FeedStackNav.Screen name="Notifications" component={NotificationsScreen} />
+      </FeedStackNav.Navigator>
+    </NavigationContainer>
+    </NavigationIndependentTree>
   );
 }
 
-function ExploreStack() {
+function ExploreStack({ onDepthChange }) {
   return (
-    <ExploreStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <ExploreStackNav.Screen name="ExploreHome" component={ExploreScreen} />
-      <ExploreStackNav.Screen name="EntityExplore" component={EntityExploreScreen} />
-      <ExploreStackNav.Screen name="PostDetail" component={PostDetailScreen} />
-      <ExploreStackNav.Screen name="Profile" component={ProfileScreen} />
-    </ExploreStackNav.Navigator>
+    <NavigationIndependentTree>
+    <NavigationContainer>
+      <ExploreStackNav.Navigator
+        screenOptions={{ headerShown: false }}
+        screenListeners={{
+          state: (e) => {
+            onDepthChange?.(e.data?.state?.routes?.length ?? 1);
+          },
+        }}
+      >
+        <ExploreStackNav.Screen name="ExploreHome" component={ExploreScreen} />
+        <ExploreStackNav.Screen name="EntityExplore" component={EntityExploreScreen} />
+        <ExploreStackNav.Screen name="PostDetail" component={PostDetailScreen} />
+        <ExploreStackNav.Screen name="Profile" component={ProfileScreen} />
+        <ExploreStackNav.Screen name="Settings" component={SettingsScreen} />
+        <ExploreStackNav.Screen name="Notifications" component={NotificationsScreen} />
+        <ExploreStackNav.Screen name="Bookmarks" component={BookmarksScreen} />
+      </ExploreStackNav.Navigator>
+    </NavigationContainer>
+    </NavigationIndependentTree>
   );
 }
 
-function MessagesStack() {
+function MessagesStack({ onDepthChange }) {
   return (
-    <MessagesStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <MessagesStackNav.Screen name="ConversationsHome" component={ConversationsScreen} />
-      <MessagesStackNav.Screen name="Chat" component={ChatScreen} />
-      <MessagesStackNav.Screen name="Profile" component={ProfileScreen} />
-    </MessagesStackNav.Navigator>
+    <NavigationIndependentTree>
+    <NavigationContainer>
+      <MessagesStackNav.Navigator
+        screenOptions={{ headerShown: false }}
+        screenListeners={{
+          state: (e) => {
+            onDepthChange?.(e.data?.state?.routes?.length ?? 1);
+          },
+        }}
+      >
+        <MessagesStackNav.Screen name="ConversationsHome" component={ConversationsScreen} />
+        <MessagesStackNav.Screen name="Chat" component={ChatScreen} />
+        <MessagesStackNav.Screen name="Profile" component={ProfileScreen} />
+        <MessagesStackNav.Screen name="Settings" component={SettingsScreen} />
+        <MessagesStackNav.Screen name="Notifications" component={NotificationsScreen} />
+        <MessagesStackNav.Screen name="Bookmarks" component={BookmarksScreen} />
+      </MessagesStackNav.Navigator>
+    </NavigationContainer>
+    </NavigationIndependentTree>
   );
 }
 
-function ProfileStack() {
+function ProfileStack({ onDepthChange }) {
   return (
-    <ProfileStackNav.Navigator screenOptions={{ headerShown: false }}>
-      <ProfileStackNav.Screen name="ProfileHome" component={ProfileScreen} />
-      <ProfileStackNav.Screen name="PostDetail" component={PostDetailScreen} />
-      <ProfileStackNav.Screen name="FollowList" component={FollowListScreen} />
-      <ProfileStackNav.Screen name="Bookmarks" component={BookmarksScreen} />
-    </ProfileStackNav.Navigator>
+    <NavigationIndependentTree>
+    <NavigationContainer>
+      <ProfileStackNav.Navigator
+        screenOptions={{ headerShown: false }}
+        screenListeners={{
+          state: (e) => {
+            onDepthChange?.(e.data?.state?.routes?.length ?? 1);
+          },
+        }}
+      >
+        <ProfileStackNav.Screen name="ProfileHome" component={ProfileScreen} />
+        <ProfileStackNav.Screen name="PostDetail" component={PostDetailScreen} />
+        <ProfileStackNav.Screen name="FollowList" component={FollowListScreen} />
+        <ProfileStackNav.Screen name="Bookmarks" component={BookmarksScreen} />
+        <ProfileStackNav.Screen name="Settings" component={SettingsScreen} />
+        <ProfileStackNav.Screen name="Notifications" component={NotificationsScreen} />
+      </ProfileStackNav.Navigator>
+    </NavigationContainer>
+    </NavigationIndependentTree>
   );
 }
 
-// ─── Custom Tab Bar ───
-function CustomTabBar({ state, descriptors, navigation }) {
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+// ─── Main Tab Navigator with Swipe ───
+export default function MainTabs() {
+  const { darkMode, accentColor } = useTheme();
+  const t = getTheme(darkMode, accentColor);
+
+  const pagerRef = useRef(null);
+  const [activeTab, setActiveTab] = useState(0);
+  const indicatorAnim = useRef(new Animated.Value(0)).current;
+
+  // Current user profile pic for tab bar
+  const [userPicUrl, setUserPicUrl] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get("/users/me");
+        setUserPicUrl(res.data?.profile_pic_url || null);
+      } catch {}
+    })();
+  }, []);
+
+  // Track depth of each stack so we disable swipe when user navigates deep
+  const stackDepths = useRef([1, 1, 1, 1]);
+  const [swipeEnabled, setSwipeEnabled] = useState(true);
+
+  const updateDepth = useCallback((tabIndex, depth) => {
+    stackDepths.current[tabIndex] = depth;
+    // Only enable swipe if the currently active stack is at root (depth === 1)
+    setSwipeEnabled(stackDepths.current[activeTab] <= 1);
+  }, [activeTab]);
+
+  // Re-evaluate swipe enabled whenever activeTab changes
+  useEffect(() => {
+    setSwipeEnabled(stackDepths.current[activeTab] <= 1);
+  }, [activeTab]);
+
+  // Unread messages badge
   const [unreadCount, setUnreadCount] = useState(0);
-
   const fetchUnread = useCallback(async () => {
     try {
       const res = await api.get("/messages/unread-count");
@@ -102,86 +205,120 @@ function CustomTabBar({ state, descriptors, navigation }) {
     return () => { clearInterval(iv); sub.remove(); };
   }, [fetchUnread]);
 
-  const TAB_META = {
-    Home:     { iconFilled: "home",        iconOutline: "home-outline" },
-    Explore:  { iconFilled: "compass",     iconOutline: "compass-outline" },
-    Messages: { iconFilled: "chatbubbles", iconOutline: "chatbubbles-outline" },
-    Profile:  { iconFilled: "person",      iconOutline: "person-outline" },
-  };
-
-  return (
-    <View style={[styles.tabBar, { backgroundColor: t.tabBarBg, borderTopColor: t.border }]}>  
-      {state.routes.map((route, i) => {
-        const isActive = state.index === i;
-        const meta = TAB_META[route.name] || {};
-        const showBadge = route.name === "Messages" && unreadCount > 0;
-
-        return (
-          <TouchableOpacity
-            key={route.key}
-            onPress={() => {
-              const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-              if (!event.defaultPrevented) {
-                navigation.navigate(route.name);
-              }
-              if (route.name === "Messages") setUnreadCount(0);
-            }}
-            style={styles.tabBtn}
-            activeOpacity={0.7}
-          >
-            <View>
-              <Ionicons
-                name={isActive ? meta.iconFilled : meta.iconOutline}
-                size={24}
-                color={isActive ? t.accentBlue : t.textSecondary}
-              />
-              {showBadge && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </Text>
-                </View>
-              )}
-            </View>
-            <Text style={[styles.tabLabel, { color: isActive ? t.accentBlue : t.textSecondary }]}>
-              {route.name}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
-}
-
-// ─── Main Tab Navigator ───
-export default function MainTabs() {
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
-  const navigationRef = useRef(null);
-
   // ─── Push notifications ───
   useEffect(() => { registerForPushNotifications(); }, []);
-
   useEffect(() => {
     const sub = addNotificationResponseListener((response) => {
       const data = response.notification.request.content.data;
-      if (data?.type === "new_message" && navigationRef.current) {
-        navigationRef.current.navigate("Messages");
+      if (data?.type === "new_message") {
+        pagerRef.current?.setPage(2); // Messages tab
       }
     });
     return () => sub.remove();
   }, []);
 
+  // ─── Tab / Pager sync ───
+  const onPageSelected = (e) => {
+    const idx = e.nativeEvent.position;
+    setActiveTab(idx);
+    Animated.spring(indicatorAnim, {
+      toValue: idx,
+      useNativeDriver: true,
+      tension: 68,
+      friction: 12,
+    }).start();
+    if (idx === 2) setUnreadCount(0); // Opened Messages
+  };
+
+  const goToTab = (idx) => {
+    pagerRef.current?.setPage(idx);
+  };
+
+  // ─── Indicator layout ───
+  const tabWidth = SW / TABS.length;
+  const indicatorTranslate = indicatorAnim.interpolate({
+    inputRange: TABS.map((_, i) => i),
+    outputRange: TABS.map((_, i) => i * tabWidth + tabWidth / 2 - 16),
+  });
+
   return (
-    <Tab.Navigator
-      tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
-      <Tab.Screen name="Home" component={FeedStack} />
-      <Tab.Screen name="Explore" component={ExploreStack} />
-      <Tab.Screen name="Messages" component={MessagesStack} />
-      <Tab.Screen name="Profile" component={ProfileStack} />
-    </Tab.Navigator>
+    <View style={{ flex: 1, backgroundColor: t.bg }}>
+      {/* Swipeable page area */}
+      <PagerView
+        ref={pagerRef}
+        style={{ flex: 1 }}
+        initialPage={0}
+        onPageSelected={onPageSelected}
+        scrollEnabled={swipeEnabled}
+        overdrag={false}
+      >
+        <View key="0" style={{ flex: 1 }}>
+          <FeedStack onDepthChange={(d) => updateDepth(0, d)} />
+        </View>
+        <View key="1" style={{ flex: 1 }}>
+          <ExploreStack onDepthChange={(d) => updateDepth(1, d)} />
+        </View>
+        <View key="2" style={{ flex: 1 }}>
+          <MessagesStack onDepthChange={(d) => updateDepth(2, d)} />
+        </View>
+        <View key="3" style={{ flex: 1 }}>
+          <ProfileStack onDepthChange={(d) => updateDepth(3, d)} />
+        </View>
+      </PagerView>
+
+      {/* Bottom Tab Bar */}
+      <View style={[styles.tabBar, { backgroundColor: t.tabBarBg, borderTopColor: t.border }]}>
+        {/* Animated indicator line */}
+        <Animated.View
+          style={[
+            styles.indicator,
+            {
+              backgroundColor: t.accentBlue,
+              transform: [{ translateX: indicatorTranslate }],
+            },
+          ]}
+        />
+
+        {TABS.map((tab, i) => {
+          const isActive = activeTab === i;
+          const showBadge = tab.key === "Messages" && unreadCount > 0;
+          const isProfileTab = tab.key === "Profile";
+
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              onPress={() => goToTab(i)}
+              style={styles.tabBtn}
+              activeOpacity={0.7}
+            >
+              <View>
+                {isProfileTab && userPicUrl ? (
+                  <View style={[styles.profilePicWrap, isActive && { borderColor: t.accentBlue }]}>
+                    <Image source={{ uri: userPicUrl }} style={styles.profilePic} />
+                  </View>
+                ) : (
+                  <Ionicons
+                    name={isActive ? tab.iconFilled : tab.iconOutline}
+                    size={24}
+                    color={isActive ? t.accentBlue : t.textSecondary}
+                  />
+                )}
+                {showBadge && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={[styles.tabLabel, { color: isActive ? t.accentBlue : t.textSecondary }]}>
+                {tab.key}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -191,6 +328,14 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     paddingBottom: 20,
     paddingTop: 8,
+    position: "relative",
+  },
+  indicator: {
+    position: "absolute",
+    top: 0,
+    width: 32,
+    height: 3,
+    borderRadius: 2,
   },
   tabBtn: {
     flex: 1,
@@ -219,5 +364,18 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 9,
     fontWeight: "700",
+  },
+  profilePicWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "transparent",
+    overflow: "hidden",
+  },
+  profilePic: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
   },
 });

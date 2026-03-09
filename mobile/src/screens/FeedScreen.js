@@ -15,7 +15,9 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as ImagePicker from "expo-image-picker";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import GifPicker from "../components/GifPicker";
 import api from "../api/client";
 import { timeAgo } from "../utils/helpers";
 
@@ -28,9 +30,16 @@ export default function FeedScreen({ navigation }) {
   const [isPosting, setIsPosting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [menuPostId, setMenuPostId] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedGif, setSelectedGif] = useState(null);
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [repostMenuPostId, setRepostMenuPostId] = useState(null);
+  const [quotePostId, setQuotePostId] = useState(null);
+  const [quoteContent, setQuoteContent] = useState("");
+  const [isQuoting, setIsQuoting] = useState(false);
 
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, accentColor } = useTheme();
+  const t = getTheme(darkMode, accentColor);
 
   // ─── Fetch Data ───
   const fetchCurrentUser = async () => {
@@ -70,16 +79,50 @@ export default function FeedScreen({ navigation }) {
   }, []);
 
   // ─── Actions ───
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Please grant photo library access to upload images.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images", "videos"],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets?.[0]) {
+      setSelectedImage(result.assets[0]);
+      setSelectedGif(null); // clear gif if image selected
+    }
+  };
+
+  const handleGifSelect = (url, preview) => {
+    setSelectedGif({ url, preview });
+    setSelectedImage(null); // clear image if gif selected
+  };
+
   const handlePost = async () => {
-    if (!content.trim()) return;
+    if (!content.trim() && !selectedImage && !selectedGif) return;
     setIsPosting(true);
     try {
       const formData = new FormData();
       formData.append("content", content);
+      if (selectedImage) {
+        const uri = selectedImage.uri;
+        const name = uri.split("/").pop() || "upload.jpg";
+        const ext = name.split(".").pop()?.toLowerCase() || "jpg";
+        const mimeMap = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", mp4: "video/mp4", mov: "video/quicktime" };
+        formData.append("file", { uri, name, type: mimeMap[ext] || "image/jpeg" });
+      }
+      if (selectedGif) {
+        formData.append("gif_url", selectedGif.url);
+      }
       await api.post("/posts/", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       setContent("");
+      setSelectedImage(null);
+      setSelectedGif(null);
       fetchPosts(false);
     } catch {
       Alert.alert("Error", "Failed to create post");
@@ -134,6 +177,75 @@ export default function FeedScreen({ navigation }) {
         )
       );
     } catch {}
+  };
+
+  const handleRepost = async (postId) => {
+    setRepostMenuPostId(null);
+    const post = posts.find((p) => p._id === postId);
+    if (!post) return;
+    const wasReposted = post.is_reposted_by_user;
+
+    setPosts((prev) =>
+      prev.map((p) =>
+        p._id === postId
+          ? {
+              ...p,
+              is_reposted_by_user: !wasReposted,
+              repost_count: wasReposted
+                ? (p.repost_count || 1) - 1
+                : (p.repost_count || 0) + 1,
+            }
+          : p
+      )
+    );
+
+    try {
+      const res = await api.post(`/reposts/${postId}`);
+      setPosts((prev) =>
+        prev.map((p) =>
+          p._id === postId
+            ? {
+                ...p,
+                is_reposted_by_user: res.data.reposted,
+                repost_count: res.data.repost_count,
+              }
+            : p
+        )
+      );
+    } catch {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p._id === postId
+            ? {
+                ...p,
+                is_reposted_by_user: wasReposted,
+                repost_count: post.repost_count || 0,
+              }
+            : p
+        )
+      );
+    }
+  };
+
+  const openQuoteRepost = (postId) => {
+    setRepostMenuPostId(null);
+    setQuotePostId(postId);
+    setQuoteContent("");
+  };
+
+  const submitQuoteRepost = async () => {
+    if (!quoteContent.trim() || !quotePostId) return;
+    setIsQuoting(true);
+    try {
+      await api.post(`/reposts/${quotePostId}/quote`, { content: quoteContent.trim() });
+      setQuotePostId(null);
+      setQuoteContent("");
+      fetchPosts(false);
+    } catch (err) {
+      Alert.alert("Error", err.response?.data?.detail || "Failed to quote repost");
+    } finally {
+      setIsQuoting(false);
+    }
   };
 
   const handleSearch = async (query) => {
@@ -324,6 +436,20 @@ export default function FeedScreen({ navigation }) {
           />
         )}
 
+        {/* GIF */}
+        {post.gif_url && !post.media_url && (
+          <View style={styles.gifPostWrap}>
+            <Image
+              source={{ uri: post.gif_url }}
+              style={styles.postMedia}
+              resizeMode="cover"
+            />
+            <View style={styles.gifPostBadge}>
+              <Text style={styles.gifBadgeText}>GIF</Text>
+            </View>
+          </View>
+        )}
+
         {/* Translate button */}
         <TouchableOpacity
           onPress={() => handleTranslate(post._id, post.content)}
@@ -430,6 +556,20 @@ export default function FeedScreen({ navigation }) {
 
           <TouchableOpacity
             style={styles.actionBtn}
+            onPress={() => setRepostMenuPostId(post._id)}
+          >
+            <Ionicons
+              name={post.is_reposted_by_user ? "repeat" : "repeat-outline"}
+              size={22}
+              color={post.is_reposted_by_user ? "#00ba7c" : t.textSecondary}
+            />
+            <Text style={[styles.actionCount, { color: post.is_reposted_by_user ? "#00ba7c" : t.textSecondary }]}>
+              {post.repost_count || 0}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionBtn}
             onPress={() => handleBookmark(post._id)}
           >
             <Ionicons
@@ -482,18 +622,51 @@ export default function FeedScreen({ navigation }) {
           multiline
           maxLength={500}
         />
-        <TouchableOpacity
-          style={[styles.postButton, !content.trim() && styles.postButtonDisabled]}
-          onPress={handlePost}
-          disabled={!content.trim() || isPosting}
-          activeOpacity={0.8}
-        >
-          {isPosting ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.postButtonText}>Post</Text>
-          )}
-        </TouchableOpacity>
+
+        {/* Image / GIF preview */}
+        {selectedImage && (
+          <View style={styles.mediaPreviewWrap}>
+            <Image source={{ uri: selectedImage.uri }} style={styles.mediaPreview} resizeMode="cover" />
+            <TouchableOpacity style={styles.mediaRemoveBtn} onPress={() => setSelectedImage(null)}>
+              <Ionicons name="close-circle" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
+        {selectedGif && (
+          <View style={styles.mediaPreviewWrap}>
+            <Image source={{ uri: selectedGif.preview || selectedGif.url }} style={styles.mediaPreview} resizeMode="cover" />
+            <TouchableOpacity style={styles.mediaRemoveBtn} onPress={() => setSelectedGif(null)}>
+              <Ionicons name="close-circle" size={24} color="#fff" />
+            </TouchableOpacity>
+            <View style={styles.gifBadge}>
+              <Text style={styles.gifBadgeText}>GIF</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Toolbar row */}
+        <View style={styles.composeToolbar}>
+          <View style={styles.composeTools}>
+            <TouchableOpacity onPress={pickImage} style={styles.toolBtn}>
+              <Ionicons name="image-outline" size={22} color={t.accentBlue} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowGifPicker(true)} style={styles.toolBtn}>
+              <Text style={[styles.gifLabel, { color: t.accentBlue }]}>GIF</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            style={[styles.postButton, (!content.trim() && !selectedImage && !selectedGif) && styles.postButtonDisabled]}
+            onPress={handlePost}
+            disabled={(!content.trim() && !selectedImage && !selectedGif) || isPosting}
+            activeOpacity={0.8}
+          >
+            {isPosting ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.postButtonText}>Post</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -505,7 +678,9 @@ export default function FeedScreen({ navigation }) {
         style={[styles.navBar, { backgroundColor: t.headerBg, borderColor: t.border }]}
       >
         <Text style={[styles.navTitle, { color: t.text }]}>Pulse</Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity onPress={() => navigation.navigate("Notifications")} hitSlop={12}>
+          <Ionicons name="notifications-outline" size={24} color={t.text} />
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (
@@ -541,6 +716,14 @@ export default function FeedScreen({ navigation }) {
         />
       )}
 
+      {/* GIF Picker */}
+      <GifPicker
+        visible={showGifPicker}
+        onClose={() => setShowGifPicker(false)}
+        onSelect={handleGifSelect}
+        theme={t}
+      />
+
       {/* 3-dot menu bottom sheet */}
       <Modal
         visible={!!menuPostId}
@@ -570,6 +753,91 @@ export default function FeedScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         </Pressable>
+      </Modal>
+
+      {/* Repost menu bottom sheet */}
+      <Modal
+        visible={!!repostMenuPostId}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRepostMenuPostId(null)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setRepostMenuPostId(null)}>
+          <View style={[styles.menuSheet, { backgroundColor: t.cardBg }]}>
+            <TouchableOpacity
+              style={styles.menuSheetItem}
+              onPress={() => handleRepost(repostMenuPostId)}
+            >
+              <Ionicons name="repeat" size={20} color="#00ba7c" />
+              <Text style={[styles.menuSheetText, { color: t.text }]}>
+                {posts.find(p => p._id === repostMenuPostId)?.is_reposted_by_user ? "Undo Repost" : "Repost"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuSheetItem}
+              onPress={() => openQuoteRepost(repostMenuPostId)}
+            >
+              <Ionicons name="create-outline" size={20} color="#00ba7c" />
+              <Text style={[styles.menuSheetText, { color: t.text }]}>
+                Quote Repost
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuSheetItem, { borderBottomWidth: 0 }]}
+              onPress={() => setRepostMenuPostId(null)}
+            >
+              <Ionicons name="close" size={20} color={t.textSecondary} />
+              <Text style={[styles.menuSheetText, { color: t.textSecondary }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Quote repost modal */}
+      <Modal
+        visible={!!quotePostId}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setQuotePostId(null)}
+      >
+        <View style={[styles.quoteOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}> 
+          <View style={[styles.quoteSheet, { backgroundColor: t.cardBg }]}>  
+            <View style={styles.quoteHeader}>
+              <Text style={[styles.quoteTitle, { color: t.text }]}>Quote Repost</Text>
+              <TouchableOpacity onPress={() => setQuotePostId(null)}>
+                <Ionicons name="close" size={24} color={t.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={[styles.quoteInput, { color: t.text, borderColor: t.border }]}
+              placeholder="Add your thoughts..."
+              placeholderTextColor={t.textSecondary}
+              value={quoteContent}
+              onChangeText={setQuoteContent}
+              multiline
+              maxLength={500}
+            />
+            {(() => {
+              const qPost = posts.find(p => p._id === quotePostId);
+              if (!qPost) return null;
+              return (
+                <View style={[styles.quotePreview, { borderColor: t.border }]}>  
+                  <Text style={[styles.quotePreviewUser, { color: t.accent }]}>@{qPost.username}</Text>
+                  <Text style={[styles.quotePreviewText, { color: t.textSecondary }]} numberOfLines={3}>{qPost.content}</Text>
+                </View>
+              );
+            })()}
+            <TouchableOpacity
+              style={[styles.quoteSubmitBtn, { opacity: quoteContent.trim() ? 1 : 0.5 }]}
+              onPress={submitQuoteRepost}
+              disabled={!quoteContent.trim() || isQuoting}
+            >
+              <Text style={styles.quoteSubmitText}>{isQuoting ? "Posting..." : "Post"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -611,6 +879,76 @@ const styles = StyleSheet.create({
     fontSize: 15,
     minHeight: 60,
     textAlignVertical: "top",
+  },
+  composeToolbar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  composeTools: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  toolBtn: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  gifLabel: {
+    fontSize: 14,
+    fontWeight: "800",
+    borderWidth: 1.5,
+    borderColor: "#1d9bf0",
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    overflow: "hidden",
+  },
+  mediaPreviewWrap: {
+    marginTop: 10,
+    borderRadius: 12,
+    overflow: "hidden",
+    position: "relative",
+  },
+  mediaPreview: {
+    width: "100%",
+    height: 180,
+    borderRadius: 12,
+  },
+  mediaRemoveBtn: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 12,
+  },
+  gifBadge: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  gifBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  gifPostWrap: {
+    position: "relative",
+    marginBottom: 8,
+  },
+  gifPostBadge: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   postButton: {
     backgroundColor: "#1d9bf0",
@@ -710,4 +1048,14 @@ const styles = StyleSheet.create({
     borderColor: "rgba(128,128,128,0.2)",
   },
   menuSheetText: { fontSize: 16, fontWeight: "600" },
+  quoteOverlay: { flex: 1, justifyContent: "center", alignItems: "center" },
+  quoteSheet: { width: "90%", borderRadius: 16, padding: 20 },
+  quoteHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  quoteTitle: { fontSize: 18, fontWeight: "700" },
+  quoteInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15, minHeight: 80, textAlignVertical: "top", marginBottom: 12 },
+  quotePreview: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 16 },
+  quotePreviewUser: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
+  quotePreviewText: { fontSize: 13 },
+  quoteSubmitBtn: { backgroundColor: "#00ba7c", borderRadius: 20, paddingVertical: 12, alignItems: "center" },
+  quoteSubmitText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 });

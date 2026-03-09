@@ -31,8 +31,8 @@ export default function ConversationsScreen({ navigation }) {
   const pollRef = useRef(null);
   const appStateRef = useRef(AppState.currentState);
 
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, accentColor } = useTheme();
+  const t = getTheme(darkMode, accentColor);
 
   // ─── Init: register public key & fetch data ───
   useEffect(() => {

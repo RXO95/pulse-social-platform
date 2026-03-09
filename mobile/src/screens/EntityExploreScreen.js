@@ -19,8 +19,8 @@ export default function EntityExploreScreen({ navigation, route }) {
 
   const [posts, setPosts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, accentColor } = useTheme();
+  const t = getTheme(darkMode, accentColor);
 
   useEffect(() => {
     (async () => {

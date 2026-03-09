@@ -3,6 +3,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const ThemeContext = createContext();
 
+// ─── Accent Color Presets ───
+export const ACCENT_COLORS = [
+  { id: "blue",   label: "Blue",   color: "#1d9bf0" },
+  { id: "purple", label: "Purple", color: "#7856ff" },
+  { id: "pink",   label: "Pink",   color: "#f91880" },
+  { id: "orange", label: "Orange", color: "#ff7a00" },
+  { id: "green",  label: "Green",  color: "#00ba7c" },
+  { id: "yellow", label: "Gold",   color: "#ffd400" },
+];
+
 // ─── Shared Theme Tokens (mirrors web ThemeContext) ───
 export const theme = {
   light: {
@@ -61,18 +71,28 @@ export const theme = {
   },
 };
 
-export function getTheme(darkMode) {
-  return darkMode ? theme.dark : theme.light;
+export function getTheme(darkMode, accentColor) {
+  const base = darkMode ? theme.dark : theme.light;
+  if (!accentColor || accentColor === "#1d9bf0") return base;
+  return {
+    ...base,
+    accentBlue: accentColor,
+    tagBg: accentColor + "1A",
+    tagText: accentColor,
+  };
 }
 
 export function ThemeProvider({ children }) {
   const [darkMode, setDarkMode] = useState(false);
+  const [accentColor, setAccentColorState] = useState("#1d9bf0");
 
   useEffect(() => {
     (async () => {
       try {
         const saved = await AsyncStorage.getItem("pulse-dark-mode");
         if (saved === "true") setDarkMode(true);
+        const savedAccent = await AsyncStorage.getItem("pulse-accent-color");
+        if (savedAccent) setAccentColorState(savedAccent);
       } catch {}
     })();
   }, []);
@@ -83,8 +103,13 @@ export function ThemeProvider({ children }) {
     await AsyncStorage.setItem("pulse-dark-mode", String(next));
   };
 
+  const setAccentColor = async (color) => {
+    setAccentColorState(color);
+    await AsyncStorage.setItem("pulse-accent-color", color);
+  };
+
   return (
-    <ThemeContext.Provider value={{ darkMode, toggleDarkMode }}>
+    <ThemeContext.Provider value={{ darkMode, toggleDarkMode, accentColor, setAccentColor }}>
       {children}
     </ThemeContext.Provider>
   );

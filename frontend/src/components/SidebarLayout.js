@@ -21,6 +21,8 @@ import PersonOutline from "@mui/icons-material/PersonOutline";
 import Person from "@mui/icons-material/Person";
 import SettingsOutlined from "@mui/icons-material/SettingsOutlined";
 import Settings from "@mui/icons-material/Settings";
+import NotificationsOutlined from "@mui/icons-material/NotificationsOutlined";
+import NotificationsIcon from "@mui/icons-material/Notifications";
 
 export default function SidebarLayout() {
   const { darkMode, background, wallpaperUrl } = useTheme();
@@ -68,6 +70,7 @@ export default function SidebarLayout() {
 
   const isActive = (path) => {
     if (path === "/feed") return location.pathname === "/feed";
+    if (path === "/notifications") return location.pathname === "/notifications";
     if (path === "/messages") return location.pathname === "/messages";
     if (path === "/trending") return location.pathname === "/trending";
     if (path === "/bookmarks") return location.pathname === "/bookmarks";
@@ -84,6 +87,12 @@ export default function SidebarLayout() {
       label: "Home",
       iconOutline: <HomeOutlined sx={iconSx} />,
       iconFilled: <Home sx={iconSx} />,
+    },
+    {
+      path: "/notifications",
+      label: "Notifications",
+      iconOutline: <NotificationsOutlined sx={iconSx} />,
+      iconFilled: <NotificationsIcon sx={iconSx} />,
     },
     {
       path: "/messages",

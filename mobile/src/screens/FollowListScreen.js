@@ -20,8 +20,8 @@ export default function FollowListScreen({ navigation, route }) {
   const [followers, setFollowers] = useState([]);
   const [following, setFollowing] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, accentColor } = useTheme();
+  const t = getTheme(darkMode, accentColor);
 
   const fetchFollowers = async () => {
     try {

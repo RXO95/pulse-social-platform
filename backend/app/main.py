@@ -16,6 +16,7 @@ from app.routes.bookmarks import router as bookmarks_router
 from app.routes.messages import router as messages_router
 from app.routes.widgets import router as widgets_router
 from app.routes.reposts import router as reposts_router
+from app.routes.notifications import router as notifications_router
 
 app = FastAPI(
     title="Pulse Backend API",
@@ -48,6 +49,7 @@ app.include_router(bookmarks_router)
 app.include_router(messages_router)
 app.include_router(widgets_router)
 app.include_router(reposts_router)
+app.include_router(notifications_router)
 
 @app.get("/")
 def root():

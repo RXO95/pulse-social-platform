@@ -62,8 +62,8 @@ export default function ChatScreen({ route, navigation }) {
     { label: "Activities", emojis: ["⚽","🏀","🎮","🎵","🎬","📸","✈️","🚀","🌍","⭐","🎉","🎊","🏆","💡","💯"] },
   ];
 
-  const { darkMode } = useTheme();
-  const t = getTheme(darkMode);
+  const { darkMode, accentColor } = useTheme();
+  const t = getTheme(darkMode, accentColor);
 
   // ─── Init ───
   useEffect(() => {

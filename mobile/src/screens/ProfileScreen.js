@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,11 @@ import {
   RefreshControl,
   Alert,
   TextInput,
+  Modal,
+  Pressable,
   StyleSheet,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,6 +32,14 @@ export default function ProfileScreen({ navigation, route }) {
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [menuPostId, setMenuPostId] = useState(null);
+  const [activeTab, setActiveTab] = useState("posts");
+  const [reposts, setReposts] = useState([]);
+  const [isLoadingReposts, setIsLoadingReposts] = useState(false);
+  const [repostMenuPostId, setRepostMenuPostId] = useState(null);
+  const [quotePostId, setQuotePostId] = useState(null);
+  const [quoteContent, setQuoteContent] = useState("");
+  const [isQuoting, setIsQuoting] = useState(false);
 
   // Edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -36,11 +48,23 @@ export default function ProfileScreen({ navigation, route }) {
   const [editPicture, setEditPicture] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const { darkMode, toggleDarkMode } = useTheme();
+  const { darkMode, toggleDarkMode, accentColor } = useTheme();
   const { logout } = useAuth();
-  const t = getTheme(darkMode);
+  const t = getTheme(darkMode, accentColor);
 
   const isOwnProfile = currentUser && profile && currentUser.username === profile.username;
+
+  // Sidebar
+  const [showSidebar, setShowSidebar] = useState(false);
+  const sidebarAnim = useRef(new Animated.Value(Dimensions.get("window").width)).current;
+
+  const openSidebar = () => {
+    setShowSidebar(true);
+    Animated.spring(sidebarAnim, { toValue: 0, useNativeDriver: true, tension: 65, friction: 11 }).start();
+  };
+  const closeSidebar = () => {
+    Animated.timing(sidebarAnim, { toValue: Dimensions.get("window").width, duration: 250, useNativeDriver: true }).start(() => setShowSidebar(false));
+  };
 
   // ─── Fetch ───
   const fetchCurrentUser = async () => {
@@ -70,15 +94,31 @@ export default function ProfileScreen({ navigation, route }) {
     setIsLoadingPosts(true);
     try {
       const res = await api.get("/posts/");
-      setPosts(res.data.filter((p) => p.username === uname));
+      setPosts(
+        res.data
+          .filter((p) => p.username === uname)
+          .map((p) => ({ ...p, translatedText: null, showTranslation: false }))
+      );
     } catch {} finally {
       setIsLoadingPosts(false);
     }
   };
 
+  const fetchReposts = async () => {
+    const uname = usernameParam || currentUser?.username;
+    if (!uname) return;
+    setIsLoadingReposts(true);
+    try {
+      const res = await api.get(`/reposts/user/${uname}`);
+      setReposts(res.data);
+    } catch {} finally {
+      setIsLoadingReposts(false);
+    }
+  };
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([fetchProfile(), fetchUserPosts()]);
+    await Promise.all([fetchProfile(), fetchUserPosts(), fetchReposts()]);
     setRefreshing(false);
   }, [usernameParam, currentUser]);
 
@@ -90,6 +130,7 @@ export default function ProfileScreen({ navigation, route }) {
     if (usernameParam || currentUser) {
       fetchProfile();
       fetchUserPosts();
+      fetchReposts();
     }
   }, [usernameParam, currentUser?.username]);
 
@@ -138,6 +179,7 @@ export default function ProfileScreen({ navigation, route }) {
 
   // ─── Delete ───
   const handleDelete = (postId) => {
+    setMenuPostId(null);
     Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -153,6 +195,101 @@ export default function ProfileScreen({ navigation, route }) {
         },
       },
     ]);
+  };
+
+  const handleBookmark = async (postId) => {
+    try {
+      const res = await api.post(`/bookmarks/${postId}`);
+      setPosts((prev) =>
+        prev.map((p) =>
+          p._id === postId ? { ...p, is_bookmarked: res.data.bookmarked } : p
+        )
+      );
+    } catch {}
+  };
+
+  const handleRepost = async (postId) => {
+    setRepostMenuPostId(null);
+    const post = posts.find((p) => p._id === postId);
+    if (!post) return;
+    const wasReposted = post.is_reposted_by_user;
+    setPosts((prev) =>
+      prev.map((p) =>
+        p._id === postId
+          ? {
+              ...p,
+              is_reposted_by_user: !wasReposted,
+              repost_count: wasReposted
+                ? (p.repost_count || 1) - 1
+                : (p.repost_count || 0) + 1,
+            }
+          : p
+      )
+    );
+    try {
+      const res = await api.post(`/reposts/${postId}`);
+      setPosts((prev) =>
+        prev.map((p) =>
+          p._id === postId
+            ? { ...p, is_reposted_by_user: res.data.reposted, repost_count: res.data.repost_count }
+            : p
+        )
+      );
+      fetchReposts();
+    } catch {
+      setPosts((prev) =>
+        prev.map((p) =>
+          p._id === postId
+            ? { ...p, is_reposted_by_user: wasReposted, repost_count: post.repost_count || 0 }
+            : p
+        )
+      );
+    }
+  };
+
+  const openQuoteRepost = (postId) => {
+    setRepostMenuPostId(null);
+    setQuotePostId(postId);
+    setQuoteContent("");
+  };
+
+  const submitQuoteRepost = async () => {
+    if (!quoteContent.trim() || !quotePostId) return;
+    setIsQuoting(true);
+    try {
+      await api.post(`/reposts/${quotePostId}/quote`, { content: quoteContent.trim() });
+      setQuotePostId(null);
+      setQuoteContent("");
+      fetchReposts();
+    } catch (err) {
+      Alert.alert("Error", err.response?.data?.detail || "Failed to quote repost");
+    } finally {
+      setIsQuoting(false);
+    }
+  };
+
+  const handleTranslate = async (postId, originalText) => {
+    const idx = posts.findIndex((p) => p._id === postId);
+    if (idx === -1) return;
+    const post = posts[idx];
+    if (post.translatedText) {
+      setPosts((prev) => {
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], showTranslation: !updated[idx].showTranslation };
+        return updated;
+      });
+      return;
+    }
+    try {
+      const res = await api.post("/translate/", { text: originalText, target_lang: "en" });
+      setPosts((prev) => {
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], translatedText: res.data.translated_text, showTranslation: true };
+        return updated;
+      });
+    } catch {
+      Alert.alert("Error", "Translation failed");
+    }
   };
 
   // ─── Edit Profile ───
@@ -215,62 +352,192 @@ export default function ProfileScreen({ navigation, route }) {
     );
   }
 
-  const renderPost = ({ item: post }) => (
-    <TouchableOpacity
-      style={[styles.postCard, { backgroundColor: t.cardBg, borderColor: t.border }]}
-      onPress={() => navigation.navigate("PostDetail", { postId: post._id })}
-      activeOpacity={0.8}
-    >
-      <Text style={[styles.postContent, { color: t.text }]}>{post.content}</Text>
-      {post.media_url && (
-        <Image source={{ uri: post.media_url }} style={styles.postMedia} resizeMode="cover" />
-      )}
-      <View style={styles.postFooter}>
-        {/* Like */}
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => handleLike(post._id)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons
-            name={post.is_liked_by_user ? "heart" : "heart-outline"}
-            size={20}
-            color={post.is_liked_by_user ? "#f91880" : t.textSecondary}
-          />
-          <Text style={{ color: t.textSecondary, fontSize: 13, marginLeft: 4 }}>
-            {post.likes || 0}
-          </Text>
-        </TouchableOpacity>
+  const renderPost = ({ item: post }) => {
+    const isMine = isOwnProfile || currentUser?.username === "Zuckk";
 
-        {/* Comment */}
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => navigation.navigate("PostDetail", { postId: post._id })}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Ionicons name="chatbubble-outline" size={18} color={t.accentBlue} />
-          <Text style={{ color: t.textSecondary, fontSize: 13, marginLeft: 4 }}>
-            {post.comment_count || 0}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Delete (own posts or admin) */}
-        {(isOwnProfile || currentUser?.username === "Zuckk") && (
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={() => handleDelete(post._id)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="trash-outline" size={18} color="#f4212e" />
+    return (
+      <TouchableOpacity
+        style={[styles.postCard, { backgroundColor: t.cardBg, borderColor: t.border }]}
+        onPress={() => navigation.navigate("PostDetail", { postId: post._id })}
+        activeOpacity={0.8}
+      >
+        {/* Header */}
+        <View style={styles.postHeader}>
+          <TouchableOpacity onPress={() => navigation.navigate("Profile", { username: post.username })}>
+            <View style={[styles.avatar, { backgroundColor: t.avatarBg }]}>
+              {post.profile_pic_url ? (
+                <Image source={{ uri: post.profile_pic_url }} style={styles.avatarImg} />
+              ) : (
+                <Text style={styles.avatarText}>{(post.username || "?")[0].toUpperCase()}</Text>
+              )}
+            </View>
           </TouchableOpacity>
+          <View style={styles.postMeta}>
+            <View style={styles.usernameRow}>
+              <TouchableOpacity onPress={() => navigation.navigate("Profile", { username: post.username })}>
+                <Text style={[styles.username, { color: t.text }]}>@{post.username}</Text>
+              </TouchableOpacity>
+              <Text style={[styles.timestamp, { color: t.textSecondary }]}>· {timeAgo(post.created_at)}</Text>
+            </View>
+          </View>
+          {isMine && (
+            <TouchableOpacity
+              onPress={() => setMenuPostId(post._id)}
+              style={styles.menuBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="ellipsis-vertical" size={18} color={t.textSecondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Content */}
+        <Text style={[styles.postContent, { color: t.text }]}>
+          {post.showTranslation ? post.translatedText : post.content}
+        </Text>
+
+        {/* Media */}
+        {post.media_url && (
+          <Image source={{ uri: post.media_url }} style={styles.postMedia} resizeMode="cover" />
         )}
 
-        <Text style={{ color: t.textSecondary, fontSize: 12, marginLeft: "auto" }}>
-          {timeAgo(post.created_at)}
-        </Text>
+        {/* GIF */}
+        {post.gif_url && !post.media_url && (
+          <View style={styles.gifPostWrap}>
+            <Image source={{ uri: post.gif_url }} style={styles.postMedia} resizeMode="cover" />
+            <View style={styles.gifPostBadge}>
+              <Text style={styles.gifBadgeText}>GIF</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Translate */}
+        <TouchableOpacity onPress={() => handleTranslate(post._id, post.content)} style={{ marginBottom: 8 }}>
+          <Text style={{ color: t.accentBlue, fontSize: 13, fontWeight: "500" }}>
+            {post.showTranslation ? "See Original" : "Translate Post"}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Entity tags */}
+        {post.entities && post.entities.length > 0 && (
+          <View style={styles.entityRow}>
+            {post.entities.slice(0, 5).map((ent, idx) => {
+              const isMention = ent.source === "mention" || ent.text.startsWith("@");
+              const isHashtag = ent.source === "hashtag" || ent.text.startsWith("#");
+              let tagBg = t.tagBg;
+              let tagColor = t.tagText;
+              if (isMention) { tagBg = t.mentionTagBg; tagColor = t.mentionTagText; }
+              else if (isHashtag) { tagBg = t.hashtagTagBg; tagColor = t.hashtagTagText; }
+              return (
+                <TouchableOpacity
+                  key={idx}
+                  style={[styles.entityTag, { backgroundColor: tagBg }]}
+                  onPress={() => {
+                    if (isMention) {
+                      navigation.navigate("Profile", { username: ent.text.replace("@", "") });
+                    } else {
+                      navigation.navigate("EntityExplore", { entityText: ent.identified_as || ent.text.replace("#", "") });
+                    }
+                  }}
+                >
+                  <Text style={[styles.entityTagText, { color: tagColor }]}>{ent.text}</Text>
+                  {ent.label ? (
+                    <Text style={{ color: t.textSecondary, fontSize: 10, marginLeft: 3 }}>{ent.label}</Text>
+                  ) : null}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Action bar */}
+        <View style={[styles.actionBar, { borderTopColor: t.border }]}>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => handleLike(post._id)}>
+            <Ionicons
+              name={post.is_liked_by_user ? "heart" : "heart-outline"}
+              size={22}
+              color={post.is_liked_by_user ? "#f91880" : t.textSecondary}
+            />
+            <Text style={[styles.actionCount, { color: t.textSecondary }]}>{post.likes || 0}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate("PostDetail", { postId: post._id })}>
+            <Ionicons name="chatbubble-outline" size={20} color={t.accentBlue} />
+            <Text style={[styles.actionCount, { color: t.textSecondary }]}>{post.comment_count || 0}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionBtn} onPress={() => setRepostMenuPostId(post._id)}>
+            <Ionicons
+              name={post.is_reposted_by_user ? "repeat" : "repeat-outline"}
+              size={22}
+              color={post.is_reposted_by_user ? "#00ba7c" : t.textSecondary}
+            />
+            <Text style={[styles.actionCount, { color: post.is_reposted_by_user ? "#00ba7c" : t.textSecondary }]}>
+              {post.repost_count || 0}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionBtn} onPress={() => handleBookmark(post._id)}>
+            <Ionicons
+              name={post.is_bookmarked ? "bookmark" : "bookmark-outline"}
+              size={20}
+              color={post.is_bookmarked ? t.accentBlue : t.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderRepost = ({ item: repost }) => {
+    const orig = repost.original_post || {};
+    return (
+      <View style={[styles.postCard, { backgroundColor: t.cardBg, borderColor: t.border }]}>
+        {/* Repost label */}
+        <View style={styles.repostLabel}>
+          <Ionicons name="repeat" size={14} color="#00ba7c" />
+          <Text style={styles.repostLabelText}>@{repost.username} reposted</Text>
+        </View>
+
+        {/* Quote content */}
+        {repost.is_quote && repost.quote_content ? (
+          <Text style={[styles.postContent, { color: t.text }]}>{repost.quote_content}</Text>
+        ) : null}
+
+        {/* Embedded original post */}
+        <TouchableOpacity
+          style={[styles.quotedPostCard, { borderColor: t.border }]}
+          onPress={() => navigation.navigate("PostDetail", { postId: orig._id || repost.post_id })}
+          activeOpacity={0.8}
+        >
+          <View style={styles.postHeader}>
+            <View style={[styles.avatar, { backgroundColor: t.avatarBg, width: 30, height: 30, borderRadius: 15 }]}>
+              {orig.profile_pic_url ? (
+                <Image source={{ uri: orig.profile_pic_url }} style={{ width: 30, height: 30, borderRadius: 15 }} />
+              ) : (
+                <Text style={[styles.avatarText, { fontSize: 13 }]}>{(orig.username || "?")[0].toUpperCase()}</Text>
+              )}
+            </View>
+            <View style={styles.postMeta}>
+              <View style={styles.usernameRow}>
+                <Text style={[styles.username, { color: t.text, fontSize: 13 }]}>@{orig.username || "unknown"}</Text>
+                <Text style={[styles.timestamp, { color: t.textSecondary }]}>· {timeAgo(orig.created_at || repost.created_at)}</Text>
+              </View>
+            </View>
+          </View>
+          <Text style={[styles.postContent, { color: t.text, fontSize: 14 }]} numberOfLines={4}>
+            {orig.content || ""}
+          </Text>
+          {orig.media_url ? (
+            <Image source={{ uri: orig.media_url }} style={[styles.postMedia, { height: 150 }]} resizeMode="cover" />
+          ) : null}
+        </TouchableOpacity>
+
+        {/* Timestamp */}
+        <Text style={[styles.timestamp, { color: t.textSecondary, marginTop: 6 }]}>{timeAgo(repost.created_at)}</Text>
       </View>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const ProfileHeader = () => (
     <View>
@@ -328,39 +595,12 @@ export default function ProfileScreen({ navigation, route }) {
 
         {/* Action button */}
         {isOwnProfile ? (
-          <View style={{ alignItems: "center", width: "100%" }}>
-            <TouchableOpacity
-              style={[styles.editBtn, { borderColor: t.border }]}
-              onPress={openEdit}
-            >
-              <Text style={{ color: t.text, fontWeight: "600" }}>Edit Profile</Text>
-            </TouchableOpacity>
-
-            {/* Settings row */}
-            <View style={styles.settingsRow}>
-              <TouchableOpacity
-                style={[styles.settingsBtn, { backgroundColor: t.inputBg }]}
-                onPress={toggleDarkMode}
-              >
-                <Ionicons name={darkMode ? "sunny" : "moon"} size={18} color={t.text} />
-                <Text style={[styles.settingsBtnText, { color: t.text }]}>
-                  {darkMode ? "Light Mode" : "Dark Mode"}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.settingsBtn, { backgroundColor: t.riskBg }]}
-                onPress={() =>
-                  Alert.alert("Logout", "Are you sure you want to logout?", [
-                    { text: "Cancel", style: "cancel" },
-                    { text: "Logout", style: "destructive", onPress: logout },
-                  ])
-                }
-              >
-                <Ionicons name="log-out-outline" size={18} color={t.riskText} />
-                <Text style={[styles.settingsBtnText, { color: t.riskText }]}>Logout</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <TouchableOpacity
+            style={[styles.editBtn, { borderColor: t.border }]}
+            onPress={openEdit}
+          >
+            <Text style={{ color: t.text, fontWeight: "600" }}>Edit Profile</Text>
+          </TouchableOpacity>
         ) : (
           <View style={{ flexDirection: "row", gap: 8 }}>
             <TouchableOpacity
@@ -390,9 +630,20 @@ export default function ProfileScreen({ navigation, route }) {
         )}
       </View>
 
-      {/* Posts header */}
-      <View style={[styles.postsHeader, { borderColor: t.border }]}>
-        <Text style={[styles.postsHeaderText, { color: t.text }]}>Posts</Text>
+      {/* Tab bar */}
+      <View style={[styles.tabBar, { borderColor: t.border }]}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === "posts" && styles.tabActive]}
+          onPress={() => setActiveTab("posts")}
+        >
+          <Text style={[styles.tabText, { color: activeTab === "posts" ? t.text : t.textSecondary }]}>Posts</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === "reposts" && styles.tabActive]}
+          onPress={() => setActiveTab("reposts")}
+        >
+          <Text style={[styles.tabText, { color: activeTab === "reposts" ? t.text : t.textSecondary }]}>Reposts</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -405,25 +656,33 @@ export default function ProfileScreen({ navigation, route }) {
           <Ionicons name="arrow-back" size={24} color={t.text} />
         </TouchableOpacity>
         <Text style={[styles.navTitle, { color: t.text }]}>@{profile.username}</Text>
-        <View style={{ width: 24 }} />
+        {isOwnProfile ? (
+          <TouchableOpacity onPress={openSidebar} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="menu" size={26} color={t.text} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 24 }} />
+        )}
       </View>
 
       <FlatList
-        data={posts}
+        data={activeTab === "posts" ? posts : reposts}
         keyExtractor={(item) => item._id}
-        renderItem={renderPost}
+        renderItem={activeTab === "posts" ? renderPost : renderRepost}
         ListHeaderComponent={ProfileHeader}
         contentContainerStyle={{ paddingBottom: 20 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accentBlue} />
         }
         ListEmptyComponent={
-          isLoadingPosts ? (
+          (activeTab === "posts" ? isLoadingPosts : isLoadingReposts) ? (
             <ActivityIndicator size="large" color={t.accentBlue} style={{ marginTop: 30 }} />
           ) : (
             <View style={styles.emptyWrap}>
-              <Ionicons name="document-text-outline" size={40} color={t.textSecondary} />
-              <Text style={{ color: t.textSecondary, marginTop: 8 }}>No posts yet</Text>
+              <Ionicons name={activeTab === "posts" ? "document-text-outline" : "repeat-outline"} size={40} color={t.textSecondary} />
+              <Text style={{ color: t.textSecondary, marginTop: 8 }}>
+                {activeTab === "posts" ? "No posts yet" : "No reposts yet"}
+              </Text>
             </View>
           )
         }
@@ -478,6 +737,180 @@ export default function ProfileScreen({ navigation, route }) {
               </TouchableOpacity>
             </View>
           </View>
+        </View>
+      )}
+
+      {/* 3-dot menu modal */}
+      <Modal
+        visible={!!menuPostId}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuPostId(null)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setMenuPostId(null)}>
+          <View style={[styles.menuSheet, { backgroundColor: t.cardBg }]}>
+            <TouchableOpacity
+              style={styles.menuSheetItem}
+              onPress={() => handleDelete(menuPostId)}
+            >
+              <Ionicons name="trash-outline" size={20} color={t.riskText} />
+              <Text style={[styles.menuSheetText, { color: t.riskText }]}>Delete Post</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuSheetItem, { borderBottomWidth: 0 }]}
+              onPress={() => setMenuPostId(null)}
+            >
+              <Ionicons name="close" size={20} color={t.textSecondary} />
+              <Text style={[styles.menuSheetText, { color: t.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Repost menu bottom sheet */}
+      <Modal
+        visible={!!repostMenuPostId}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRepostMenuPostId(null)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setRepostMenuPostId(null)}>
+          <View style={[styles.menuSheet, { backgroundColor: t.cardBg }]}>
+            <TouchableOpacity
+              style={styles.menuSheetItem}
+              onPress={() => handleRepost(repostMenuPostId)}
+            >
+              <Ionicons name="repeat" size={20} color="#00ba7c" />
+              <Text style={[styles.menuSheetText, { color: t.text }]}>
+                {posts.find(p => p._id === repostMenuPostId)?.is_reposted_by_user ? "Undo Repost" : "Repost"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.menuSheetItem}
+              onPress={() => openQuoteRepost(repostMenuPostId)}
+            >
+              <Ionicons name="create-outline" size={20} color="#00ba7c" />
+              <Text style={[styles.menuSheetText, { color: t.text }]}>Quote Repost</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.menuSheetItem, { borderBottomWidth: 0 }]}
+              onPress={() => setRepostMenuPostId(null)}
+            >
+              <Ionicons name="close" size={20} color={t.textSecondary} />
+              <Text style={[styles.menuSheetText, { color: t.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Quote repost modal */}
+      <Modal
+        visible={!!quotePostId}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setQuotePostId(null)}
+      >
+        <View style={[styles.quoteOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+          <View style={[styles.quoteSheet, { backgroundColor: t.cardBg }]}>
+            <View style={styles.quoteHeader}>
+              <Text style={[styles.quoteTitle, { color: t.text }]}>Quote Repost</Text>
+              <TouchableOpacity onPress={() => setQuotePostId(null)}>
+                <Ionicons name="close" size={24} color={t.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={[styles.quoteInput, { color: t.text, borderColor: t.border }]}
+              placeholder="Add your thoughts..."
+              placeholderTextColor={t.textSecondary}
+              value={quoteContent}
+              onChangeText={setQuoteContent}
+              multiline
+              maxLength={500}
+            />
+            {(() => {
+              const qPost = posts.find(p => p._id === quotePostId);
+              if (!qPost) return null;
+              return (
+                <View style={[styles.quotePreview, { borderColor: t.border }]}>
+                  <Text style={[styles.quotePreviewUser, { color: t.accent }]}>@{qPost.username}</Text>
+                  <Text style={[styles.quotePreviewText, { color: t.textSecondary }]} numberOfLines={3}>{qPost.content}</Text>
+                </View>
+              );
+            })()}
+            <TouchableOpacity
+              style={[styles.quoteSubmitBtn, { opacity: quoteContent.trim() ? 1 : 0.5 }]}
+              onPress={submitQuoteRepost}
+              disabled={!quoteContent.trim() || isQuoting}
+            >
+              <Text style={styles.quoteSubmitText}>{isQuoting ? "Posting..." : "Post"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── Sidebar Drawer ─── */}
+      {showSidebar && (
+        <View style={StyleSheet.absoluteFill}>
+          <Pressable style={styles.sidebarBackdrop} onPress={closeSidebar} />
+          <Animated.View style={[styles.sidebarContainer, { backgroundColor: t.cardBg, transform: [{ translateX: sidebarAnim }] }]}>
+            {/* Sidebar header */}
+            <View style={styles.sidebarHeader}>
+              <View style={[styles.sidebarAvatar, { backgroundColor: t.avatarBg }]}>
+                {profile?.profile_pic_url ? (
+                  <Image source={{ uri: profile.profile_pic_url }} style={styles.sidebarAvatarImg} />
+                ) : (
+                  <Text style={styles.sidebarAvatarText}>{(profile?.username || "?")[0].toUpperCase()}</Text>
+                )}
+              </View>
+              <Text style={[styles.sidebarName, { color: t.text }]}>@{profile?.username}</Text>
+              <TouchableOpacity onPress={closeSidebar} style={styles.sidebarClose}>
+                <Ionicons name="close" size={24} color={t.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <View style={[styles.sidebarDivider, { backgroundColor: t.border }]} />
+
+            {/* Sidebar items */}
+            <TouchableOpacity
+              style={styles.sidebarItem}
+              onPress={() => { closeSidebar(); navigation.navigate("Bookmarks"); }}
+            >
+              <Ionicons name="bookmark-outline" size={22} color={t.text} />
+              <Text style={[styles.sidebarItemText, { color: t.text }]}>Bookmarks</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.sidebarItem}
+              onPress={() => { closeSidebar(); navigation.navigate("Settings"); }}
+            >
+              <Ionicons name="settings-outline" size={22} color={t.text} />
+              <Text style={[styles.sidebarItemText, { color: t.text }]}>Settings</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.sidebarItem}
+              onPress={toggleDarkMode}
+            >
+              <Ionicons name={darkMode ? "sunny-outline" : "moon-outline"} size={22} color={t.text} />
+              <Text style={[styles.sidebarItemText, { color: t.text }]}>{darkMode ? "Light Mode" : "Dark Mode"}</Text>
+            </TouchableOpacity>
+
+            <View style={{ flex: 1 }} />
+            <View style={[styles.sidebarDivider, { backgroundColor: t.border }]} />
+            <TouchableOpacity
+              style={styles.sidebarItem}
+              onPress={() => {
+                closeSidebar();
+                Alert.alert("Logout", "Are you sure you want to logout?", [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Logout", style: "destructive", onPress: logout },
+                ]);
+              }}
+            >
+              <Ionicons name="log-out-outline" size={22} color={t.riskText} />
+              <Text style={[styles.sidebarItemText, { color: t.riskText }]}>Logout</Text>
+            </TouchableOpacity>
+            <View style={{ height: 30 }} />
+          </Animated.View>
         </View>
       )}
     </SafeAreaView>
@@ -557,22 +990,109 @@ const styles = StyleSheet.create({
 
   postsHeader: { borderBottomWidth: 1, paddingVertical: 14, paddingHorizontal: 16, marginTop: 16 },
   postsHeaderText: { fontSize: 16, fontWeight: "700" },
+  tabBar: { flexDirection: "row", borderBottomWidth: 1, marginTop: 16 },
+  tab: { flex: 1, alignItems: "center", paddingVertical: 14 },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: "#00ba7c" },
+  tabText: { fontSize: 15, fontWeight: "700" },
 
   postCard: {
     marginHorizontal: 12,
     marginTop: 10,
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
   },
-  postContent: { fontSize: 15, lineHeight: 22 },
-  postMedia: { width: "100%", height: 180, borderRadius: 10, marginTop: 8 },
-  postFooter: { flexDirection: "row", alignItems: "center", marginTop: 10, gap: 16 },
-  actionBtn: { flexDirection: "row", alignItems: "center" },
+  postHeader: { flexDirection: "row", alignItems: "flex-start", marginBottom: 10 },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  avatarImg: { width: 40, height: 40, borderRadius: 20 },
+  avatarText: { fontSize: 16, fontWeight: "700", color: "#fff" },
+  postMeta: { marginLeft: 10, flex: 1 },
+  usernameRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
+  username: { fontWeight: "700", fontSize: 15 },
+  timestamp: { fontSize: 12, marginLeft: 4 },
+  menuBtn: { padding: 6 },
+  postContent: { fontSize: 15, lineHeight: 22, marginBottom: 8 },
+  postMedia: { width: "100%", height: 200, borderRadius: 12, marginBottom: 8 },
+  gifPostWrap: { position: "relative", marginBottom: 8 },
+  gifPostBadge: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  gifBadgeText: { color: "#fff", fontSize: 11, fontWeight: "800" },
+  entityRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 10 },
+  entityTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 9999,
+  },
+  entityTagText: { fontSize: 12, fontWeight: "600" },
+  actionBar: {
+    flexDirection: "row",
+    gap: 24,
+    marginTop: 4,
+    paddingTop: 10,
+    borderTopWidth: 0.5,
+  },
+  actionBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
+  actionCount: { fontSize: 13, fontWeight: "600" },
 
   emptyWrap: { alignItems: "center", marginTop: 40 },
 
-  // Modal
+  // Menu modal
+  menuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  menuSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingVertical: 8,
+    paddingBottom: 30,
+  },
+  menuSheetItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    gap: 12,
+    borderBottomWidth: 0.5,
+    borderColor: "rgba(128,128,128,0.2)",
+  },
+  menuSheetText: { fontSize: 16, fontWeight: "600" },
+
+  // Repost card
+  repostLabel: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
+  repostLabelText: { fontSize: 13, fontWeight: "600", color: "#00ba7c" },
+  quotedPostCard: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 4 },
+
+  // Quote repost modal
+  quoteOverlay: { flex: 1, justifyContent: "center", alignItems: "center" },
+  quoteSheet: { width: "90%", borderRadius: 16, padding: 20 },
+  quoteHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  quoteTitle: { fontSize: 18, fontWeight: "700" },
+  quoteInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 15, minHeight: 80, textAlignVertical: "top", marginBottom: 12 },
+  quotePreview: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 16 },
+  quotePreviewUser: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
+  quotePreviewText: { fontSize: 13 },
+  quoteSubmitBtn: { backgroundColor: "#00ba7c", borderRadius: 20, paddingVertical: 12, alignItems: "center" },
+  quoteSubmitText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+
+  // Edit Profile Modal
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -606,4 +1126,49 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: "center",
   },
+
+  // Sidebar drawer
+  sidebarBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+  sidebarContainer: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: Dimensions.get("window").width * 0.72,
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: -2, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  sidebarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  sidebarAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  sidebarAvatarImg: { width: 44, height: 44, borderRadius: 22 },
+  sidebarAvatarText: { fontSize: 18, fontWeight: "700", color: "#fff" },
+  sidebarName: { fontSize: 16, fontWeight: "700", marginLeft: 12, flex: 1 },
+  sidebarClose: { padding: 4 },
+  sidebarDivider: { height: 1, marginVertical: 8 },
+  sidebarItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 14,
+  },
+  sidebarItemText: { fontSize: 16, fontWeight: "600" },
 });
