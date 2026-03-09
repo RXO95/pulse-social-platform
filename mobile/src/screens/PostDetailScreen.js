@@ -14,6 +14,7 @@ import {
   StyleSheet,
   Modal,
   Pressable,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,6 +22,30 @@ import { useTheme, getTheme } from "../context/ThemeContext";
 import GifPicker from "../components/GifPicker";
 import api from "../api/client";
 import { timeAgo } from "../utils/helpers";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+
+const AutoGif = ({ uri, style }) => {
+  const [ratio, setRatio] = useState(16 / 9);
+  useEffect(() => {
+    if (uri) {
+      Image.getSize(
+        uri,
+        (w, h) => { if (w && h) setRatio(w / h); },
+        () => {}
+      );
+    }
+  }, [uri]);
+  const maxW = SCREEN_WIDTH - 64;
+  const height = Math.min(maxW / ratio, 400);
+  return (
+    <Image
+      source={{ uri }}
+      style={[style, { height, width: "100%" }]}
+      resizeMode="contain"
+    />
+  );
+};
 
 export default function PostDetailScreen({ navigation, route }) {
   const { postId } = route.params;
@@ -154,6 +179,66 @@ export default function PostDetailScreen({ navigation, route }) {
 
   const handleCommentGifSelect = (url, preview) => {
     setCommentGif({ url, preview });
+  };
+
+  // ─── Comment Like ───
+  const handleCommentLike = async (commentId) => {
+    setComments((prev) =>
+      prev.map((c) => {
+        if (c._id !== commentId) return c;
+        return {
+          ...c,
+          is_liked_by_user: !c.is_liked_by_user,
+          likes: c.is_liked_by_user ? (c.likes || 1) - 1 : (c.likes || 0) + 1,
+        };
+      })
+    );
+    try {
+      const res = await api.post(`/comments/${commentId}/like`);
+      setComments((prev) =>
+        prev.map((c) => {
+          if (c._id !== commentId) return c;
+          return { ...c, is_liked_by_user: res.data.liked, likes: res.data.likes };
+        })
+      );
+    } catch {
+      setComments((prev) =>
+        prev.map((c) => {
+          if (c._id !== commentId) return c;
+          return {
+            ...c,
+            is_liked_by_user: !c.is_liked_by_user,
+            likes: c.is_liked_by_user ? (c.likes || 1) - 1 : (c.likes || 0) + 1,
+          };
+        })
+      );
+    }
+  };
+
+  // ─── Comment Bookmark ───
+  const handleCommentBookmark = async (commentId) => {
+    setComments((prev) =>
+      prev.map((c) => {
+        if (c._id !== commentId) return c;
+        return { ...c, is_bookmarked_by_user: !c.is_bookmarked_by_user };
+      })
+    );
+    try {
+      const res = await api.post(`/comments/${commentId}/bookmark`);
+      setComments((prev) =>
+        prev.map((c) => {
+          if (c._id !== commentId) return c;
+          return { ...c, is_bookmarked_by_user: res.data.bookmarked };
+        })
+      );
+    } catch {
+      setComments((prev) =>
+        prev.map((c) => {
+          if (c._id !== commentId) return c;
+          return { ...c, is_bookmarked_by_user: !c.is_bookmarked_by_user };
+        })
+      );
+    }
   };
 
   const handleTranslate = async () => {
@@ -329,12 +414,46 @@ export default function PostDetailScreen({ navigation, route }) {
         ) : null}
         {item.gif_url && (
           <View style={{ position: "relative", marginTop: 6 }}>
-            <Image source={{ uri: item.gif_url }} style={styles.commentGifImg} resizeMode="cover" />
+            <AutoGif uri={item.gif_url} style={styles.commentGifImg} />
             <View style={styles.commentGifBadge}>
               <Text style={{ color: "#fff", fontSize: 9, fontWeight: "800" }}>GIF</Text>
             </View>
           </View>
         )}
+        {/* Comment Action Buttons */}
+        <View style={styles.commentActions}>
+          <TouchableOpacity
+            style={styles.commentActionBtn}
+            onPress={() => handleCommentLike(item._id)}
+          >
+            <Ionicons
+              name={item.is_liked_by_user ? "heart" : "heart-outline"}
+              size={16}
+              color={item.is_liked_by_user ? "#F4212E" : t.textSecondary}
+            />
+            {(item.likes || 0) > 0 && (
+              <Text style={[styles.commentActionCount, { color: item.is_liked_by_user ? "#F4212E" : t.textSecondary }]}>
+                {item.likes}
+              </Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.commentActionBtn}
+            onPress={() => setNewComment(`@${item.username} `)}
+          >
+            <Ionicons name="chatbubble-outline" size={15} color={t.textSecondary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.commentActionBtn}
+            onPress={() => handleCommentBookmark(item._id)}
+          >
+            <Ionicons
+              name={item.is_bookmarked_by_user ? "bookmark" : "bookmark-outline"}
+              size={16}
+              color={item.is_bookmarked_by_user ? t.accentBlue : t.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -374,7 +493,7 @@ export default function PostDetailScreen({ navigation, route }) {
 
       {post.gif_url && !post.media_url && (
         <View style={{ position: "relative", marginBottom: 10 }}>
-          <Image source={{ uri: post.gif_url }} style={styles.postMedia} resizeMode="cover" />
+          <AutoGif uri={post.gif_url} style={styles.postMediaGif} />
           <View style={styles.gifPostBadge}>
             <Text style={styles.gifBadgeText}>GIF</Text>
           </View>
@@ -624,6 +743,7 @@ const styles = StyleSheet.create({
 
   postContent: { fontSize: 17, lineHeight: 26, marginBottom: 10 },
   postMedia: { width: "100%", height: 220, borderRadius: 12, marginBottom: 10 },
+  postMediaGif: { borderRadius: 12, marginBottom: 10 },
 
   entityRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 12 },
   entityTag: {
@@ -775,9 +895,22 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   commentGifImg: {
-    width: "100%",
-    height: 140,
     borderRadius: 10,
+  },
+  commentActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 18,
+    marginTop: 8,
+  },
+  commentActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    padding: 2,
+  },
+  commentActionCount: {
+    fontSize: 12,
   },
   commentGifBadge: {
     position: "absolute",

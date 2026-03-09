@@ -9,9 +9,10 @@ const RepostButton = ({ isReposted, count = 0, onRepost, onQuoteRepost }) => {
   const { darkMode, background } = useTheme();
   const t = getTheme(darkMode, background);
   const defaultColor = t.textSecondary || '#71767b';
+  const glass = background && background !== 'none';
 
   return (
-    <StyledWrapper $active={isReposted} $defaultColor={defaultColor} $cardBg={t.cardBg} $text={t.text} $border={t.border}>
+    <StyledWrapper $active={isReposted} $defaultColor={defaultColor} $cardBg={t.cardBg} $text={t.text} $border={t.border} $glass={glass}>
       <div className="action-row">
         <div
           title="Repost"
@@ -137,12 +138,14 @@ const StyledWrapper = styled.div`
     left: 50%;
     transform: translateX(-50%);
     margin-bottom: 8px;
-    background: ${p => p.$cardBg};
-    border: 1px solid ${p => p.$border};
+    background: ${p => p.$glass ? 'rgba(30, 30, 30, 0.75)' : p.$cardBg};
+    backdrop-filter: ${p => p.$glass ? 'blur(24px) saturate(1.4)' : 'none'};
+    -webkit-backdrop-filter: ${p => p.$glass ? 'blur(24px) saturate(1.4)' : 'none'};
+    border: 1px solid ${p => p.$glass ? 'rgba(255,255,255,0.22)' : p.$border};
     border-radius: 12px;
     padding: 4px 0;
     min-width: 180px;
-    box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+    box-shadow: ${p => p.$glass ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 28px rgba(0,0,0,0.35)'};
     z-index: 1000;
     overflow: hidden;
   }

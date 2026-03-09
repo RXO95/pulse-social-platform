@@ -25,15 +25,15 @@ export default function FollowListScreen({ navigation, route }) {
 
   const fetchFollowers = async () => {
     try {
-      const res = await api.get(`/follow/${userId}/followers`);
-      setFollowers(res.data);
+      const res = await api.get(`/follow/followers/${username}`);
+      setFollowers(res.data.users || []);
     } catch {}
   };
 
   const fetchFollowing = async () => {
     try {
-      const res = await api.get(`/follow/${userId}/following`);
-      setFollowing(res.data);
+      const res = await api.get(`/follow/following/${username}`);
+      setFollowing(res.data.users || []);
     } catch {}
   };
 

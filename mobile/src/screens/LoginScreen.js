@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Dimensions,
 } from "react-native";
 import * as SecureStore from "expo-secure-store";
 import { LinearGradient } from "expo-linear-gradient";
@@ -61,12 +62,15 @@ export default function LoginScreen({ navigation }) {
   return (
     <LinearGradient colors={["#1a1a2e", "#16213e", "#0f3460"]} style={styles.gradient}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.flex}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          bounces={false}
+          overScrollMode="never"
         >
           {/* Brand */}
           <View style={styles.brandContainer}>
@@ -131,6 +135,8 @@ export default function LoginScreen({ navigation }) {
   );
 }
 
+const { height: SCREEN_H } = Dimensions.get("window");
+
 const styles = StyleSheet.create({
   gradient: { flex: 1 },
   flex: { flex: 1 },
@@ -138,6 +144,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
     padding: 24,
+    minHeight: SCREEN_H,
   },
   brandContainer: {
     alignItems: "center",
@@ -145,7 +152,7 @@ const styles = StyleSheet.create({
   },
   appName: {
     fontSize: 42,
-    fontWeight: "800",
+    fontWeight: "bold",
     color: "#ffffff",
     letterSpacing: 1,
   },
@@ -156,14 +163,18 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   card: {
-    backgroundColor: "rgba(255,255,255,0.97)",
+    backgroundColor: "#ffffff",
     borderRadius: 24,
     padding: 32,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
-    elevation: 12,
+    ...(Platform.OS === "android"
+      ? { elevation: 6 }
+      : {
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.2,
+          shadowRadius: 16,
+        }),
+    overflow: "hidden",
   },
   inputGroup: {
     marginBottom: 20,
@@ -185,10 +196,11 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: "#0f1419",
-    borderRadius: 9999,
+    borderRadius: 28,
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 12,
+    overflow: "hidden",
   },
   buttonText: {
     color: "#ffffff",

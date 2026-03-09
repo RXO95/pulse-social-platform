@@ -12,6 +12,7 @@ import {
   Modal,
   Pressable,
   StyleSheet,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,6 +21,31 @@ import { useTheme, getTheme } from "../context/ThemeContext";
 import GifPicker from "../components/GifPicker";
 import api from "../api/client";
 import { timeAgo } from "../utils/helpers";
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+
+// Auto-sizing GIF component
+const AutoGif = ({ uri, style }) => {
+  const [ratio, setRatio] = useState(16 / 9);
+  useEffect(() => {
+    if (uri) {
+      Image.getSize(
+        uri,
+        (w, h) => { if (w && h) setRatio(w / h); },
+        () => {}
+      );
+    }
+  }, [uri]);
+  const maxW = SCREEN_WIDTH - 64;
+  const height = Math.min(maxW / ratio, 400);
+  return (
+    <Image
+      source={{ uri }}
+      style={[style, { height, width: "100%" }]}
+      resizeMode="contain"
+    />
+  );
+};
 
 export default function FeedScreen({ navigation }) {
   const [posts, setPosts] = useState([]);
@@ -439,11 +465,7 @@ export default function FeedScreen({ navigation }) {
         {/* GIF */}
         {post.gif_url && !post.media_url && (
           <View style={styles.gifPostWrap}>
-            <Image
-              source={{ uri: post.gif_url }}
-              style={styles.postMedia}
-              resizeMode="cover"
-            />
+            <AutoGif uri={post.gif_url} style={styles.postMediaGif} />
             <View style={styles.gifPostBadge}>
               <Text style={styles.gifBadgeText}>GIF</Text>
             </View>
@@ -650,8 +672,8 @@ export default function FeedScreen({ navigation }) {
             <TouchableOpacity onPress={pickImage} style={styles.toolBtn}>
               <Ionicons name="image-outline" size={22} color={t.accentBlue} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowGifPicker(true)} style={styles.toolBtn}>
-              <Text style={[styles.gifLabel, { color: t.accentBlue }]}>GIF</Text>
+            <TouchableOpacity onPress={() => setShowGifPicker(true)} style={[styles.toolBtn, styles.gifBtn]}>
+              <Text style={[styles.gifLabel, { color: t.accentBlue, borderColor: t.accentBlue }]}>GIF</Text>
             </TouchableOpacity>
           </View>
           <TouchableOpacity
@@ -894,16 +916,24 @@ const styles = StyleSheet.create({
   toolBtn: {
     padding: 8,
     borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  gifBtn: {
+    height: 38,
+    width: 38,
+    padding: 0,
   },
   gifLabel: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: "800",
     borderWidth: 1.5,
-    borderColor: "#1d9bf0",
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    overflow: "hidden",
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    textAlign: "center",
+    textAlignVertical: "center",
+    includeFontPadding: false,
   },
   mediaPreviewWrap: {
     marginTop: 10,
@@ -994,6 +1024,7 @@ const styles = StyleSheet.create({
 
   postContent: { fontSize: 15, lineHeight: 22, marginBottom: 8 },
   postMedia: { width: "100%", height: 200, borderRadius: 12, marginBottom: 8 },
+  postMediaGif: { borderRadius: 12, marginBottom: 8 },
   riskBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,

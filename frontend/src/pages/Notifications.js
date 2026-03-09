@@ -3,6 +3,13 @@ import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import useIsMobile from "../hooks/useIsMobile";
+import NotificationsIcon from "@mui/icons-material/Notifications";
+import NotificationsNoneOutlined from "@mui/icons-material/NotificationsNoneOutlined";
+import FavoriteIcon from "@mui/icons-material/Favorite";
+import ChatBubbleIcon from "@mui/icons-material/ChatBubble";
+import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import RepeatIcon from "@mui/icons-material/Repeat";
+import FormatQuoteIcon from "@mui/icons-material/FormatQuote";
 
 /* ─── helpers ─── */
 function timeAgo(dateString) {
@@ -24,11 +31,11 @@ function timeAgo(dateString) {
 }
 
 const ICON_MAP = {
-  like:         { icon: "favorite",       color: "#f91880" },
-  comment:      { icon: "chat_bubble",    color: "#1d9bf0" },
-  follow:       { icon: "person_add",     color: "#7856ff" },
-  repost:       { icon: "repeat",         color: "#00ba7c" },
-  quote_repost: { icon: "format_quote",   color: "#ff7a00" },
+  like:         { Icon: FavoriteIcon,    color: "#f91880" },
+  comment:      { Icon: ChatBubbleIcon,  color: "#1d9bf0" },
+  follow:       { Icon: PersonAddIcon,   color: "#7856ff" },
+  repost:       { Icon: RepeatIcon,      color: "#00ba7c" },
+  quote_repost: { Icon: FormatQuoteIcon, color: "#ff7a00" },
 };
 
 export default function Notifications() {
@@ -80,14 +87,8 @@ export default function Notifications() {
 
   const typeIcon = (type) => {
     const cfg = ICON_MAP[type] || ICON_MAP.like;
-    return (
-      <span
-        className="material-icons"
-        style={{ fontSize: 18, color: cfg.color }}
-      >
-        {cfg.icon}
-      </span>
-    );
+    const { Icon } = cfg;
+    return <Icon sx={{ fontSize: 14, color: cfg.color }} />;
   };
 
   const message = (n) => {
@@ -172,7 +173,6 @@ export default function Notifications() {
         backdropFilter: glass ? "blur(20px)" : undefined,
         display: "flex", alignItems: "center", gap: 12,
       }}>
-        <span className="material-icons" style={{ fontSize: 28, color: t.text }}>notifications</span>
         <span style={{ fontSize: 20, fontWeight: 800, color: t.text }}>Notifications</span>
       </div>
 
@@ -192,9 +192,7 @@ export default function Notifications() {
           alignItems: "center", justifyContent: "center",
           padding: 60, color: t.textSecondary,
         }}>
-          <span className="material-icons" style={{ fontSize: 48, marginBottom: 12 }}>
-            notifications_none
-          </span>
+          <NotificationsNoneOutlined sx={{ fontSize: 48, marginBottom: '12px', color: t.textSecondary }} />
           <span style={{ fontSize: 16 }}>No notifications yet</span>
         </div>
       ) : (
