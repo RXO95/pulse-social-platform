@@ -11,9 +11,13 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
+import * as SecureStore from "expo-secure-store";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../context/AuthContext";
 import api from "../api/client";
+import { deriveBackupKey, ensureKeys } from "../utils/crypto";
+
+const BACKUP_KEY_STORE = "pulse_backup_key";
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState("");
@@ -30,7 +34,21 @@ export default function LoginScreen({ navigation }) {
     setIsLoading(true);
     try {
       const res = await api.post("/auth/login", { email, password });
-      await login(res.data.access_token);
+      const token = res.data.access_token;
+
+      // Store token first so api calls inside ensureKeys work
+      await login(token);
+
+      // Derive backup key from password and set up E2EE keys
+      try {
+        const meRes = await api.get("/users/me");
+        const userId = meRes.data._id || meRes.data.user_id || email;
+        const backupKeyHex = await deriveBackupKey(password, userId);
+        await SecureStore.setItemAsync(BACKUP_KEY_STORE, backupKeyHex);
+        await ensureKeys(backupKeyHex);
+      } catch (e) {
+        console.warn("[E2EE] Key setup after login failed:", e);
+      }
     } catch (err) {
       const msg =
         err.response?.data?.detail || "Invalid credentials. Please try again.";

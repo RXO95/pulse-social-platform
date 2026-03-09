@@ -137,7 +137,7 @@ export default function PostDetail() {
   const handleSubmitNote = async () => {
     if (!newNote.trim() && !commentGifUrl) return;
     try {
-      const body = { content: newNote };
+      const body = { content: newNote.trim() };
       if (commentGifUrl) body.gif_url = commentGifUrl;
       const res = await fetch(`${API}/comments/${postId}`, {
         method: "POST",
@@ -151,10 +151,88 @@ export default function PostDetail() {
       if (res.ok) {
         setNewNote("");
         setCommentGifUrl(null);
-        fetchNotes(); // Refresh list
+        fetchNotes();
       }
     } catch {
       alert("Failed to add comment");
+    }
+  };
+
+  // Delete a Comment
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm("Delete this comment?")) return;
+    try {
+      const res = await fetch(`${API}/comments/${commentId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setNotes(prev => prev.filter(n => n._id !== commentId));
+      }
+    } catch {
+      alert("Failed to delete comment");
+    }
+  };
+
+  // Toggle Like on Comment
+  const handleCommentLike = async (commentId) => {
+    // Optimistic update
+    setNotes(prev => prev.map(n => {
+      if (n._id !== commentId) return n;
+      return {
+        ...n,
+        is_liked_by_user: !n.is_liked_by_user,
+        likes: n.is_liked_by_user ? (n.likes || 1) - 1 : (n.likes || 0) + 1
+      };
+    }));
+    try {
+      const res = await fetch(`${API}/comments/${commentId}/like`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotes(prev => prev.map(n => {
+          if (n._id !== commentId) return n;
+          return { ...n, is_liked_by_user: data.liked, likes: data.likes };
+        }));
+      }
+    } catch {
+      // Revert on error
+      setNotes(prev => prev.map(n => {
+        if (n._id !== commentId) return n;
+        return {
+          ...n,
+          is_liked_by_user: !n.is_liked_by_user,
+          likes: n.is_liked_by_user ? (n.likes || 1) - 1 : (n.likes || 0) + 1
+        };
+      }));
+    }
+  };
+
+  // Toggle Bookmark on Comment
+  const handleCommentBookmark = async (commentId) => {
+    setNotes(prev => prev.map(n => {
+      if (n._id !== commentId) return n;
+      return { ...n, is_bookmarked_by_user: !n.is_bookmarked_by_user };
+    }));
+    try {
+      const res = await fetch(`${API}/comments/${commentId}/bookmark`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotes(prev => prev.map(n => {
+          if (n._id !== commentId) return n;
+          return { ...n, is_bookmarked_by_user: data.bookmarked };
+        }));
+      }
+    } catch {
+      setNotes(prev => prev.map(n => {
+        if (n._id !== commentId) return n;
+        return { ...n, is_bookmarked_by_user: !n.is_bookmarked_by_user };
+      }));
     }
   };
 
@@ -485,13 +563,78 @@ export default function PostDetail() {
           {notes.map((note) => (
             <div key={note._id} style={styles.noteCard}>
               <div style={styles.noteHeader}>
-                <strong>@{note.username}</strong>
-                <small style={{color: t.textSecondary}}>{new Date(note.created_at).toLocaleDateString()}</small>
+                <strong 
+                  style={{cursor: "pointer"}}
+                  onClick={() => navigate(`/profile/${note.username}`)}
+                >@{note.username}</strong>
+                <div style={{display: "flex", alignItems: "center", gap: "8px"}}>
+                  <small style={{color: t.textSecondary}}>{new Date(note.created_at).toLocaleDateString()}</small>
+                  {currentUser && currentUser.username === note.username && (
+                    <button
+                      onClick={() => handleDeleteComment(note._id)}
+                      title="Delete comment"
+                      style={styles.deleteBtn}
+                    >
+                      <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                        <path d="M16 6V4.5C16 3.12 14.88 2 13.5 2h-3C9.11 2 8 3.12 8 4.5V6H3v2h1.06l.81 11.21C4.98 20.78 6.28 22 7.86 22h8.27c1.58 0 2.89-1.22 2.99-2.79L19.93 8H21V6h-5zm-6-1.5c0-.28.22-.5.5-.5h3c.27 0 .5.22.5.5V6h-4V4.5zM17.13 19.1c-.04.52-.47.9-1 .9H7.86c-.53 0-.96-.38-1-.9L6.07 8h11.85l-.79 11.1zM9 17h2V10H9v7zm4 0h2V10h-2v7z"/>
+                      </svg>
+                    </button>
+                  )}
+                </div>
               </div>
-              <p style={{margin:"5px 0", fontSize:"14px", color: t.text}}>{note.content}</p>
+              {note.content && <p style={{margin:"5px 0", fontSize:"14px", color: t.text, wordBreak: "break-word"}}>{note.content}</p>}
               {note.gif_url && (
                 <img src={note.gif_url} alt="GIF" style={{maxWidth: "200px", borderRadius: "12px", marginTop: "6px"}} />
               )}
+              {/* Comment Action Buttons */}
+              <div style={styles.commentActions}>
+                {/* Like */}
+                <div
+                  style={{...styles.commentActionBtn, color: note.is_liked_by_user ? "#F4212E" : t.textSecondary}}
+                  onClick={() => handleCommentLike(note._id)}
+                  title="Like"
+                >
+                  {note.is_liked_by_user ? (
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="#F4212E">
+                      <path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.98C3.907 4.19 6.043 3 8.399 3c1.837 0 3.238.84 4.1 1.78A5.61 5.61 0 0 1 16.6 3c2.358 0 4.494 1.19 5.617 3.21 1.116 2.06 1.026 4.48-.333 6.98z"/>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                      <path d="M16.697 5.5c-1.222-.06-2.679.51-3.89 2.16l-.805 1.09-.806-1.09C9.984 6.01 8.526 5.44 7.304 5.5c-1.243.07-2.349.78-2.91 1.91-.552 1.12-.633 2.78.479 4.82 1.074 1.97 3.257 4.27 7.129 6.61 3.87-2.34 6.052-4.64 7.126-6.61 1.111-2.04 1.03-3.7.477-4.82-.56-1.13-1.666-1.84-2.908-1.91zm4.187 7.69c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.98C3.907 4.19 6.043 3 8.399 3c1.837 0 3.238.84 4.1 1.78A5.61 5.61 0 0 1 16.6 3c2.358 0 4.494 1.19 5.617 3.21 1.116 2.06 1.026 4.48-.333 6.98z"/>
+                    </svg>
+                  )}
+                  {(note.likes || 0) > 0 && <span style={{fontSize: "12px"}}>{note.likes}</span>}
+                </div>
+                {/* Reply (scroll to comment box) */}
+                <div
+                  style={styles.commentActionBtn}
+                  onClick={() => {
+                    const ta = document.querySelector('textarea');
+                    if (ta) { ta.focus(); ta.value = `@${note.username} `; setNewNote(`@${note.username} `); }
+                  }}
+                  title="Reply"
+                >
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z"/>
+                  </svg>
+                </div>
+                {/* Bookmark */}
+                <div
+                  style={{...styles.commentActionBtn, color: note.is_bookmarked_by_user ? "#1d9bf0" : t.textSecondary}}
+                  onClick={() => handleCommentBookmark(note._id)}
+                  title={note.is_bookmarked_by_user ? "Remove bookmark" : "Bookmark"}
+                >
+                  {note.is_bookmarked_by_user ? (
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="#1d9bf0">
+                      <path d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5z"/>
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                      <path d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5zM6.5 4c-.276 0-.5.22-.5.5v14.56l6-4.29 6 4.29V4.5c0-.28-.224-.5-.5-.5h-11z"/>
+                    </svg>
+                  )}
+                </div>
+              </div>
             </div>
           ))}
           {notes.length === 0 && <p style={{color: t.textSecondary, fontStyle:"italic"}}>No comments yet.</p>}
@@ -608,7 +751,38 @@ function getStyles(t, m, bg) { const glass = bg && bg !== "none"; return {
   
   notesList: { display: "flex", flexDirection: "column", gap: "0" },
   noteCard: { backgroundColor: "transparent", padding: m ? "12px 0" : "14px 0", borderBottom: `1px solid ${t.border}`, transition: "background-color 0.3s" },
-  noteHeader: { display: "flex", justifyContent: "space-between", marginBottom: "4px", fontSize: "13px", color: t.text },
+  noteHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", fontSize: "13px", color: t.text },
+
+  commentActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: m ? "20px" : "24px",
+    marginTop: "8px",
+    paddingTop: "4px"
+  },
+  commentActionBtn: {
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    cursor: "pointer",
+    color: t.textSecondary,
+    fontSize: "13px",
+    padding: "4px",
+    borderRadius: "50%",
+    transition: "color 0.2s"
+  },
+  deleteBtn: {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    color: t.textSecondary,
+    padding: "4px",
+    borderRadius: "50%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "color 0.2s"
+  },
   
   regenerateBtn: {
     backgroundColor: t.accentBlue,

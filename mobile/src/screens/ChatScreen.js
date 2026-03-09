@@ -19,7 +19,7 @@ import { Audio } from "expo-av";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import api, { BASE_URL } from "../api/client";
 import { timeAgo } from "../utils/helpers";
-import { encryptMessage, decryptMessage, getPublicKeyJwk } from "../utils/crypto";
+import { encryptMessage, decryptMessage, getPublicKeyJwk, loadKeyPair } from "../utils/crypto";
 
 // Pre-load sound assets
 const sendSoundFile = require("../../assets/happy-pop-2.mp3");
@@ -192,6 +192,7 @@ export default function ChatScreen({ route, navigation }) {
         ciphertext,
         iv,
         sender_public_key: senderPubKey,
+        recipient_public_key: recipientKey,
       });
 
       setDecryptedCache((prev) => ({ ...prev, [res.data._id]: draft.trim() }));
@@ -210,33 +211,36 @@ export default function ChatScreen({ route, navigation }) {
     async (msg) => {
       if (decryptedCache[msg._id]) return decryptedCache[msg._id];
 
-      // For received messages: prefer per-message sender key, then fallback to server key
       const isMine = msg.sender_id === currentUser?._id;
-      let otherPubKey = null;
+      const stored = await loadKeyPair();
+      const myPubKeyStr = stored ? JSON.stringify(stored.publicJwk) : null;
 
-      if (!isMine && msg.sender_public_key) {
-        otherPubKey = msg.sender_public_key;
-      } else if (recipientKey) {
-        otherPubKey = recipientKey;
+      // Build list of keys to try in order of likelihood
+      const keysToTry = [];
+
+      if (isMine) {
+        // For own messages: use recipient key (from per-message field → then server)
+        if (msg.recipient_public_key) keysToTry.push(msg.recipient_public_key);
+        if (recipientKey && !keysToTry.includes(recipientKey)) keysToTry.push(recipientKey);
+      } else {
+        // For received messages: use sender key (per-message → server)
+        if (msg.sender_public_key) keysToTry.push(msg.sender_public_key);
+        if (recipientKey && !keysToTry.includes(recipientKey)) keysToTry.push(recipientKey);
       }
 
-      if (!otherPubKey) return "[encrypted]";
-
-      try {
-        const plain = await decryptMessage(msg.ciphertext, msg.iv, otherPubKey);
-        setDecryptedCache((prev) => ({ ...prev, [msg._id]: plain }));
-        return plain;
-      } catch {
-        // Fallback: try server's current key
-        if (!isMine && msg.sender_public_key && recipientKey && msg.sender_public_key !== recipientKey) {
-          try {
-            const plain = await decryptMessage(msg.ciphertext, msg.iv, recipientKey);
+      for (const key of keysToTry) {
+        try {
+          const plain = await decryptMessage(msg.ciphertext, msg.iv, key);
+          if (plain && plain.length > 0) {
             setDecryptedCache((prev) => ({ ...prev, [msg._id]: plain }));
             return plain;
-          } catch { /* both failed */ }
+          }
+        } catch {
+          // Try next key
         }
-        return "[unable to decrypt]";
       }
+
+      return keysToTry.length === 0 ? "[encrypted]" : "[unable to decrypt]";
     },
     [recipientKey, decryptedCache, currentUser]
   );

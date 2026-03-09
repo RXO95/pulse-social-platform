@@ -4,14 +4,17 @@
 
 ![Status](https://img.shields.io/badge/status-active-success.svg)
 ![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)
-![React](https://img.shields.io/badge/React-18+-61DAFB.svg)
+![React](https://img.shields.io/badge/React-19+-61DAFB.svg)
+![React Native](https://img.shields.io/badge/React_Native-Expo_SDK_52-000020.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248.svg)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C.svg)
+![WebSocket](https://img.shields.io/badge/WebSocket-E2EE_Chat-purple.svg)
+![Cloudinary](https://img.shields.io/badge/Cloudinary-Media_Upload-3448C5.svg)
 
-**A production-ready social media platform with real-time AI content moderation, multilingual NER, and intelligent context enrichment**
+**A production-ready social media platform with real-time AI content moderation, end-to-end encrypted messaging, multilingual NER, and cross-platform mobile support**
 
-[Features](#-key-features) • [Architecture](#-architecture) • [Tech Stack](#-tech-stack) • [Setup](#-quick-start) • [Demo](#-screenshots)
+[Features](#-key-features) • [Architecture](#-architecture) • [Tech Stack](#-tech-stack) • [Setup](#-quick-start) • [Mobile](#-mobile-app) • [Demo](#-screenshots)
 
 </div>
 
@@ -23,12 +26,16 @@ Pulse is a full-stack social media platform that combines modern web technologie
 
 ### What Makes This Special?
 
-- ** Custom AI Model**: Transformer-based NER model trained on Indian language datasets (Hindi, Hinglish, English)
-- ** Microservices Architecture**: Separation of concerns with dedicated ML inference service
-- ** Multilingual Support**: Real-time translation and entity recognition across multiple languages
-- ** Intelligent Moderation**: Context-aware content filtering with risk scoring
-- ** Smart Analytics**: AI-driven trending topics (no hashtags needed)
-- ** Modern UI/UX**: Glassmorphic design with animated backgrounds and smooth interactions
+- **Custom AI Model**: Transformer-based NER model trained on Indian language datasets (Hindi, Hinglish, English)
+- **Cross-Platform**: React 19 web app + React Native (Expo) mobile app for iOS & Android
+- **End-to-End Encrypted Messaging**: ECDH P-256 + AES-GCM-256 encrypted DMs with WebSocket real-time delivery
+- **Microservices Architecture**: Separation of concerns with dedicated ML inference service
+- **Multilingual Support**: Real-time translation and entity recognition across multiple languages
+- **Intelligent Moderation**: Context-aware content filtering with risk scoring
+- **Media Uploads**: Cloudinary-powered image/video uploads with face-detection cropping for avatars
+- **Smart Analytics**: AI-driven trending topics (no hashtags needed)
+- **Modern UI/UX**: Glassmorphic design with animated backgrounds (Matrix, Stars, Wallpaper), dark mode, and responsive layout
+- **Push Notifications**: Expo Push Notifications for mobile users
 
 ---
 
@@ -41,12 +48,33 @@ Pulse is a full-stack social media platform that combines modern web technologie
 - Protected routes and authorization middleware
 
 ### **Social Features**
-- **Post Creation**: Rich text posts with real-time AI analysis
-- **Interactive Feed**: Infinite scroll with lazy loading
-- **Engagement**: Like, comment, and share functionality
-- **Social Graph**: Follow/unfollow users with relationship tracking
-- **User Profiles**: Personalized profile pages with post history
+- **Post Creation**: Rich text posts with real-time AI analysis, media uploads (images/videos via Cloudinary), and GIF attachments (Tenor)
+- **Interactive Feed**: Infinite scroll with lazy loading and skeleton loaders
+- **Engagement**: Like, comment, bookmark, repost, and quote repost functionality
+- **Social Graph**: Follow/unfollow users with relationship tracking, followers/following lists
+- **User Profiles**: Personalized profile pages with post history, profile picture uploads (face-detection cropping)
 - **Search**: Entity-based intelligent search
+- **Bookmarks**: Save and manage favorite posts
+- **Reposts & Quote Reposts**: Share posts directly or with commentary (quote reposts include AI moderation)
+
+### **End-to-End Encrypted Messaging**
+- **ECDH Key Exchange**: P-256 elliptic curve Diffie-Hellman for secure key agreement
+- **AES-GCM-256 Encryption**: All messages encrypted client-side before transmission
+- **WebSocket Real-Time Delivery**: Instant message push, typing indicators, reactions, and deletion events
+- **Key Backup & Restore**: PBKDF2 password-derived encrypted key backup for device migration
+- **Rich Features**: Reply-to, emoji reactions, GIF attachments, conversation management
+- **Zero-Knowledge Server**: Server stores only ciphertext — never sees plaintext messages
+- **Push Notifications**: Expo Push Notifications for offline message delivery
+
+### **Theming & UI Customization**
+- **Dark Mode**: Full dark/light theme toggle with 20+ design tokens
+- **Animated Backgrounds**: Matrix (Indic script grid), Stars, or custom Wallpaper via Wallhaven
+- **Responsive Layout**: Desktop sidebar + mobile bottom navigation
+- **Glassmorphic Design**: Modern frosted-glass UI throughout
+
+### **Widgets**
+- **News Widget**: Google News headlines via backend RSS proxy
+- **Weather Widget**: Location-based weather with animated particles (rain/snow/sun), day/night gradients, and 7-day forecast
 
 ### **AI/ML Capabilities**
 
@@ -85,21 +113,27 @@ Pulse is a full-stack social media platform that combines modern web technologie
 ##  Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                        FRONTEND                              │
-│  React 18 + React Router + Styled Components                │
-│  - Glassmorphic UI with animated backgrounds                │
-│  - Real-time updates & optimistic UI                        │
-└──────────────────┬──────────────────────────────────────────┘
-                   │ REST API
-                   ▼
+┌──────────────────────────┐  ┌──────────────────────────────┐
+│      WEB FRONTEND        │  │      MOBILE APP              │
+│  React 19 + Router 7     │  │  React Native + Expo SDK 52  │
+│  Styled Components       │  │  React Navigation 7          │
+│  Web Crypto API (E2EE)   │  │  SecureStore (E2EE)          │
+│  Dark Mode + Backgrounds │  │  Push Notifications          │
+└────────────┬─────────────┘  └──────────────┬───────────────┘
+             │ REST API + WebSocket           │
+             └──────────────┬─────────────────┘
+                            ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                    BACKEND API LAYER                         │
 │              FastAPI + Motor (Async MongoDB)                 │
-│  ┌────────────┬────────────┬────────────┬────────────┐      │
-│  │   Auth     │   Posts    │   Social   │   Search   │      │
-│  │  Routes    │   Routes   │   Routes   │   Routes   │      │
-│  └────────────┴────────────┴────────────┴────────────┘      │
+│  ┌──────────┬──────────┬──────────┬──────────┬──────────┐   │
+│  │  Auth    │  Posts   │ Messages │ Social   │  Search  │   │
+│  │  Routes  │  Routes  │  (E2EE)  │ Routes   │  Routes  │   │
+│  ├──────────┼──────────┼──────────┼──────────┼──────────┤   │
+│  │Bookmarks │ Reposts  │ Entities │ Widgets  │ Trending │   │
+│  │  Routes  │  Routes  │  Routes  │  Routes  │  Routes  │   │
+│  └──────────┴──────────┴──────────┴──────────┴──────────┘   │
+│  WebSocket Server · Cloudinary Integration                   │
 └──────────────────┬──────────────────────────────────────────┘
                    │
          ┌─────────┴─────────┐
@@ -111,10 +145,10 @@ Pulse is a full-stack social media platform that combines modern web technologie
 │  │ NER Model  │  │  │  │   Users    │  │
 │  │ Inference  │  │  │  │   Posts    │  │
 │  │ Pipeline   │  │  │  │  Comments  │  │
-│  └────────────┘  │  │  └────────────┘  │
-│  - PyTorch       │  │  - Indexed       │
-│  - Transformers  │  │  - Sharded       │
-│  - FastAPI       │  │  - Replicated    │
+│  └────────────┘  │  │  │  Messages  │  │
+│  - PyTorch       │  │  │  Bookmarks │  │
+│  - Transformers  │  │  │  Reposts   │  │
+│  - FastAPI       │  │  └────────────┘  │
 └──────────────────┘  └──────────────────┘
          │                   
          ▼                   
@@ -122,30 +156,53 @@ Pulse is a full-stack social media platform that combines modern web technologie
 │   EXTERNAL SERVICES          │
 │  - Google Translate API      │
 │  - Wikipedia API             │
-│  - Google News (Scraping)    │
+│  - Google News (RSS/Scraping)│
+│  - Cloudinary (Media)        │
+│  - Tenor (GIFs)              │
+│  - Wallhaven (Wallpapers)    │
+│  - Open-Meteo (Weather)      │
+│  - Expo Push API             │
 └──────────────────────────────┘
 ```
 
 ### Why This Architecture?
 
- **Scalability**: ML service can be independently scaled based on inference load  
- **Maintainability**: Clear separation of concerns (API, ML, Data)  
- **Production-Ready**: Follows industry best practices for microservices  
- **Performance**: Async operations throughout, connection pooling, caching  
- **Resilience**: Graceful degradation when external services fail  
+**Scalability**: ML service can be independently scaled based on inference load  
+**Maintainability**: Clear separation of concerns (API, ML, Data, Web, Mobile)  
+**Security**: End-to-end encryption means the server never sees message content  
+**Production-Ready**: Follows industry best practices for microservices  
+**Performance**: Async operations throughout, connection pooling, caching, WebSocket for real-time  
+**Resilience**: Graceful degradation when external services fail  
+**Cross-Platform**: Single backend serves both web and mobile clients  
 
 ---
 
 ## Tech Stack
 
-### Frontend
+### Frontend (Web)
 | Technology | Purpose |
 |-----------|---------|
-| **React 18** | Component-based UI framework |
-| **React Router** | Client-side routing |
+| **React 19** | Component-based UI framework |
+| **React Router 7** | Client-side routing |
 | **Styled Components** | CSS-in-JS styling |
-| **Context API** | State management |
-| **Fetch API** | HTTP client |
+| **MUI (Material UI)** | Icon library & UI components |
+| **Axios** | HTTP client |
+| **Context API** | State management (Auth, Theme) |
+| **Web Crypto API** | Client-side E2EE (ECDH + AES-GCM) |
+| **IndexedDB** | Persistent E2EE key storage |
+| **WebSocket** | Real-time messaging |
+
+### Mobile App
+| Technology | Purpose |
+|-----------|---------|
+| **React Native** | Cross-platform mobile framework |
+| **Expo SDK 52** | Managed workflow & native APIs |
+| **React Navigation 7** | Screen navigation (tabs + stacks) |
+| **Expo SecureStore** | Secure token & key storage |
+| **Expo Notifications** | Push notifications |
+| **Expo Location** | GPS-based weather widget |
+| **Expo Image Picker** | Media selection |
+| **Expo AV** | Audio playback |
 
 ### Backend
 | Technology | Purpose |
@@ -153,9 +210,12 @@ Pulse is a full-stack social media platform that combines modern web technologie
 | **FastAPI** | High-performance async web framework |
 | **Motor** | Async MongoDB driver |
 | **MongoDB Atlas** | Cloud-hosted NoSQL database |
+| **WebSockets** | Real-time messaging server |
+| **Cloudinary** | Media upload & transformation |
 | **PyJWT** | JWT token generation/validation |
 | **Bcrypt** | Password hashing |
 | **HTTPX** | Async HTTP client |
+| **python-multipart** | File upload handling |
 
 ### ML/AI
 | Technology | Purpose |
@@ -166,6 +226,18 @@ Pulse is a full-stack social media platform that combines modern web technologie
 | **FastAPI** | ML model serving |
 | **Custom NER Model** | Indian language entity recognition |
 
+### External Services
+| Service | Purpose |
+|---------|---------|
+| **Cloudinary** | Image/video hosting & transformation |
+| **Tenor API** | GIF search & embedding |
+| **Wallhaven API** | Wallpaper backgrounds |
+| **Open-Meteo API** | Weather data |
+| **Google Translate** | Text translation |
+| **Wikipedia API** | Entity disambiguation & context |
+| **Google News RSS** | News headlines |
+| **Expo Push API** | Mobile push notifications |
+
 ### DevOps & Tools
 | Technology | Purpose |
 |-----------|---------|
@@ -173,6 +245,7 @@ Pulse is a full-stack social media platform that combines modern web technologie
 | **Conda** | Environment management |
 | **NPM** | Package management |
 | **Uvicorn** | ASGI server |
+| **EAS Build** | Expo Application Services for mobile builds |
 
 ---
 
@@ -181,23 +254,65 @@ Pulse is a full-stack social media platform that combines modern web technologie
 ```
 pulse-social-platform/
 │
-├── frontend/                    # React Frontend Application
+├── frontend/                    # React 19 Web Application
 │   ├── public/                  # Static assets
 │   ├── src/
-│   │   ├── api/                 # API client configuration
+│   │   ├── api/                 # Axios API client
 │   │   ├── components/          # Reusable UI components
-│   │   │   ├── StarsBackground.js   # Animated background
-│   │   │   ├── LikeButton.js
-│   │   │   ├── CommentButton.js
-│   │   │   └── Loader.js
-│   │   ├── context/             # React Context (Auth)
+│   │   │   ├── BookmarkButton.js    # Toggle bookmark
+│   │   │   ├── BottomNav.js         # Mobile bottom navigation
+│   │   │   ├── CommentButton.js     # Comment interaction
+│   │   │   ├── DarkModeToggle.js    # Theme switcher
+│   │   │   ├── GifPicker.js         # Tenor GIF search modal
+│   │   │   ├── LikeButton.js        # Like interaction
+│   │   │   ├── Loader.js            # Loading spinner
+│   │   │   ├── MatrixBackground.js  # Animated Indic script grid
+│   │   │   ├── NewsWidget.js        # Google News headlines
+│   │   │   ├── PostLoader.js        # Skeleton shimmer loader
+│   │   │   ├── PulseLogo.js         # SVG logo component
+│   │   │   ├── RepostButton.js      # Repost/quote repost
+│   │   │   ├── SidebarLayout.js     # Responsive layout wrapper
+│   │   │   ├── StarsBackground.js   # Animated starry background
+│   │   │   └── WeatherWidget.js     # Animated weather card
+│   │   ├── context/             # React Context
+│   │   │   ├── AuthContext.js       # JWT auth state
+│   │   │   └── ThemeContext.js      # Dark mode + backgrounds
+│   │   ├── hooks/               # Custom hooks
+│   │   │   └── useIsMobile.js       # Responsive breakpoint
 │   │   ├── pages/               # Page components
-│   │   │   ├── Login.js
-│   │   │   ├── Signup.js
-│   │   │   ├── Feed.js
-│   │   │   ├── Profile.js
-│   │   │   └── PostDetail.js
+│   │   │   ├── Login.js / Signup.js
+│   │   │   ├── Feed.js             # Home feed
+│   │   │   ├── Profile.js          # User profiles
+│   │   │   ├── PostDetail.js       # Single post view
+│   │   │   ├── Bookmarks.js        # Saved posts
+│   │   │   ├── Messages.js         # E2EE chat
+│   │   │   ├── Settings.js         # Theme & wallpaper
+│   │   │   ├── Compose.js          # Post creation
+│   │   │   ├── EntityExplore.js    # NER entity knowledge card
+│   │   │   └── FollowList.js       # Followers/following
 │   │   └── App.js
+│   └── package.json
+│
+├── mobile/                      # React Native (Expo) Mobile App
+│   ├── App.js                   # Entry point
+│   ├── app.json                 # Expo config
+│   ├── src/
+│   │   ├── api/client.js        # Axios + auth interceptor
+│   │   ├── context/             # Auth & Theme contexts
+│   │   ├── navigation/          # React Navigation
+│   │   │   ├── RootNavigator.js     # Auth gate
+│   │   │   ├── AuthStack.js         # Login/Signup
+│   │   │   └── MainTabs.js          # Bottom tabs + stacks
+│   │   ├── screens/             # 12 screens
+│   │   │   ├── FeedScreen.js        # Home feed + compose
+│   │   │   ├── ExploreScreen.js     # Discovery
+│   │   │   ├── ConversationsScreen.js # Message list
+│   │   │   ├── ChatScreen.js        # E2EE chat
+│   │   │   ├── ProfileScreen.js     # View/edit profile
+│   │   │   ├── BookmarksScreen.js   # Saved posts
+│   │   │   ├── TrendingScreen.js    # Trending entities
+│   │   │   └── EntityExploreScreen.js
+│   │   └── utils/helpers.js
 │   └── package.json
 │
 ├── backend/                     # FastAPI Backend
@@ -208,24 +323,31 @@ pulse-social-platform/
 │   │   │   └── dependency.py    # Auth middleware
 │   │   ├── models/              # Pydantic models
 │   │   │   ├── user.py
-│   │   │   └── post.py
+│   │   │   ├── post.py
+│   │   │   └── message.py       # E2EE message models
 │   │   ├── routes/              # API endpoints
 │   │   │   ├── auth.py          # Signup/Login
-│   │   │   ├── posts.py         # CRUD operations
+│   │   │   ├── posts.py         # CRUD + media upload
 │   │   │   ├── feed.py          # Global feed
 │   │   │   ├── personal_feed.py # Following feed
 │   │   │   ├── likes.py         # Like system
 │   │   │   ├── comments.py      # Comments
 │   │   │   ├── follow.py        # Social graph
-│   │   │   ├── users.py         # User profiles
+│   │   │   ├── users.py         # User profiles + avatar upload
 │   │   │   ├── search.py        # Entity search
 │   │   │   ├── trending.py      # Trending topics
-│   │   │   └── translate.py     # Translation
+│   │   │   ├── translate.py     # Translation
+│   │   │   ├── bookmarks.py     # Bookmark system
+│   │   │   ├── messages.py      # E2EE DMs + WebSocket
+│   │   │   ├── reposts.py       # Repost & quote repost
+│   │   │   ├── entities.py      # NER entity exploration
+│   │   │   └── widgets.py       # News, GIFs, wallpapers
 │   │   ├── services/
 │   │   │   ├── database.py      # MongoDB connection
-│   │   │   └── ml_client.py     # ML service client + context enrichment
+│   │   │   ├── ml_client.py     # ML service client + context enrichment
+│   │   │   └── cloudinary_helper.py  # Media upload service
 │   │   ├── config.py            # Configuration
-│   │   └── main.py              # FastAPI app
+│   │   └── main.py              # FastAPI app + WebSocket
 │   └── requirements.txt
 │
 ├── ml-service/                  # ML Microservice
@@ -239,12 +361,18 @@ pulse-social-platform/
 │   │       └── refinement.py    # Post-processing
 │   ├── models/
 │   │   └── ner_model/           # Trained model files
-│   │       ├── config.json
-│   │       ├── model.safetensors
-│   │       ├── tokenizer.json
-│   │       └── sentencepiece.bpe.model
 │   └── requirements.txt
 │
+├── model_result/                # NER Model Evaluation
+│   └── evaluate_paper.py        # WikiANN Hindi test evaluation
+│
+├── frontend-simple/             # Lightweight vanilla HTML/JS frontend
+│   ├── index.html
+│   ├── login.html / signup.html
+│   ├── app.js
+│   └── style.css
+│
+├── workflow.html                # Architecture visualization
 └── README.md
 ```
 
@@ -255,9 +383,11 @@ pulse-social-platform/
 ### Prerequisites
 ```bash
 - Python 3.9+
-- Node.js 16+
+- Node.js 18+
 - MongoDB Atlas account (or local MongoDB)
 - Conda (recommended)
+- Cloudinary account (for media uploads)
+- Expo Go app (for mobile testing)
 ```
 
 ### 1️ Clone the Repository
@@ -281,6 +411,9 @@ pip install -r requirements.txt
 # MONGO_URI=your_mongodb_connection_string
 # SECRET_KEY=your_secret_key
 # ML_SERVICE_URL=http://localhost:9001/analyze
+# CLOUDINARY_CLOUD_NAME=your_cloud_name
+# CLOUDINARY_API_KEY=your_api_key
+# CLOUDINARY_API_SECRET=your_api_secret
 
 # Run backend
 uvicorn app.main:app --reload --port 8000
@@ -318,11 +451,29 @@ npm start
 npm run build
 ```
 
-### 5️ Access the Application
-- **Frontend**: http://localhost:3000
+### 5️ Mobile App Setup
+```bash
+cd mobile
+
+# Install dependencies
+npm install
+
+# Start Expo dev server
+npx expo start
+
+# Scan QR code with Expo Go (Android) or Camera app (iOS)
+# Update src/api/client.js with your backend URL:
+#   iOS Simulator:    http://localhost:8000
+#   Android Emulator: http://10.0.2.2:8000
+#   Physical Device:  http://<your-LAN-IP>:8000
+```
+
+### 6️ Access the Application
+- **Web Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 - **ML Service**: http://localhost:9001
+- **Mobile**: Expo Go app (scan QR code)
 
 ---
 
@@ -339,6 +490,51 @@ Posts are automatically analyzed and blocked if they contain sensitive content
 
 ### Profile Pages
 User profiles with post history and social statistics
+
+### E2E Encrypted Messaging
+Real-time encrypted conversations with typing indicators, reactions, and GIF support
+
+### Mobile App
+Native iOS & Android experience with push notifications and full feature parity
+
+---
+
+## 📱 Mobile App
+
+A full-featured React Native (Expo) companion app with feature parity to the web frontend.
+
+### Screens
+| Screen | Description |
+|--------|-------------|
+| **Feed** | Home feed with pull-to-refresh and compose |
+| **Explore** | Discovery and search |
+| **Conversations** | Message list with unread counts |
+| **Chat** | E2EE real-time chat with typing indicators |
+| **Profile** | View/edit profile with picture upload |
+| **Bookmarks** | Saved posts |
+| **Trending** | NER-powered trending entities |
+| **Entity Explore** | Tap NER tags to explore entity knowledge cards |
+| **Follow List** | Followers/following lists |
+
+### Mobile-Specific Features
+- **Push Notifications**: Expo Push for offline message delivery
+- **Secure Storage**: JWT tokens and E2EE keys in SecureStore
+- **GPS Weather**: Location-based weather widget via expo-location
+- **Image Picker**: Native camera/gallery access
+- **Audio Playback**: Sound effects via expo-av
+- **Dark Mode**: System-aware theme with AsyncStorage persistence
+- **Bottom Tab Navigation**: Feed, Explore, Messages, Profile
+
+### Building for Production
+```bash
+# Using EAS Build (recommended)
+npm install -g eas-cli
+eas build --platform all
+
+# Or traditional Expo builds
+npx expo build:ios      # Requires Apple Developer account
+npx expo build:android
+```
 
 ---
 
@@ -394,6 +590,7 @@ Traditional social media moderation relies on:
    - FastAPI async routes
    - Motor async MongoDB driver
    - HTTPX async HTTP client
+   - WebSocket real-time messaging
    - Non-blocking I/O throughout
 
 5. **Smart Caching & Optimization**
@@ -401,6 +598,19 @@ Traditional social media moderation relies on:
    - Connection pooling for databases
    - Optimized aggregation pipelines
    - Efficient batch processing
+
+6. **End-to-End Encrypted Messaging**
+   - ECDH P-256 key exchange + AES-GCM-256 encryption
+   - Zero-knowledge server architecture
+   - WebSocket real-time delivery with typing indicators
+   - Encrypted key backup for device migration
+   - Works across web and mobile clients
+
+7. **Cross-Platform Mobile App**
+   - Full-featured React Native (Expo) app
+   - Shared backend with web frontend
+   - Push notifications for offline users
+   - SecureStore for token & key management
 
 ---
 
@@ -414,7 +624,7 @@ POST   /auth/login           # Authenticate user
 
 ### Posts
 ```http
-POST   /posts/               # Create new post (with AI analysis)
+POST   /posts/               # Create new post (with AI analysis + media upload)
 GET    /posts/               # Get all posts
 GET    /posts/{id}           # Get specific post
 DELETE /posts/{id}           # Delete own post
@@ -425,6 +635,41 @@ DELETE /posts/{id}           # Delete own post
 POST   /follow/{user_id}     # Follow user
 DELETE /follow/{user_id}     # Unfollow user
 POST   /likes/{post_id}      # Like post
+POST   /bookmarks/{post_id}  # Toggle bookmark
+GET    /bookmarks/           # Get bookmarked posts
+```
+
+### Reposts
+```http
+POST   /reposts/{post_id}           # Simple repost (toggle)
+POST   /reposts/{post_id}/quote     # Quote repost with commentary
+GET    /reposts/post/{post_id}      # Get repost info for a post
+GET    /reposts/user/{username}     # Get user's reposts
+```
+
+### End-to-End Encrypted Messaging
+```http
+POST   /messages/keys                              # Upload ECDH public key
+GET    /messages/keys/{user_id}                    # Get user's public key
+PUT    /messages/key-backup                        # Store encrypted key backup
+GET    /messages/key-backup                        # Retrieve key backup
+POST   /messages/push-token                        # Register push token
+GET    /messages/conversations                     # List conversations
+POST   /messages/conversations/{user_id}           # Get/create conversation
+GET    /messages/conversations/{id}/messages       # Fetch messages (cursor pagination)
+POST   /messages/send                              # Send encrypted message
+GET    /messages/unread-count                      # Total unread count
+DELETE /messages/{message_id}                      # Delete message
+POST   /messages/{message_id}/react                # Toggle emoji reaction
+WS     /messages/ws/{token}                        # WebSocket real-time connection
+```
+
+### Entities (NER Exploration)
+```http
+GET    /entities/                    # List all unique entities
+GET    /entities/stats               # Entity statistics by type
+GET    /entities/{entity_text}       # Entity knowledge card (Wikipedia + posts)
+GET    /entities/trending/today      # 24-hour trending entities with velocity
 ```
 
 ### Discovery
@@ -435,12 +680,20 @@ GET    /feed/                # Global feed
 GET    /personal_feed/       # Following feed
 ```
 
+### Widgets
+```http
+GET    /widgets/news         # Google News RSS proxy
+GET    /widgets/wallpapers   # Wallhaven wallpaper search
+GET    /widgets/gifs         # Tenor GIF search
+```
+
 ### Features
 ```http
 POST   /comments/{post_id}   # Add comment
 GET    /comments/{post_id}   # Get comments
 POST   /translate/           # Translate text
 GET    /users/me             # Current user
+PUT    /users/me             # Update profile (username, bio, avatar)
 GET    /users/{username}     # User profile
 ```
 
@@ -529,10 +782,11 @@ Post BLOCKED with message: "Content violates community guidelines"
 Building Pulse provided hands-on experience with:
 
 **Full-Stack Development**
-- Modern React patterns (Hooks, Context, Routing)
-- RESTful API design
+- Modern React 19 patterns (Hooks, Context, Routing)
+- React Native / Expo mobile development
+- RESTful API design + WebSocket real-time communication
 - Database modeling and optimization
-- Authentication & authorization
+- Authentication & authorization (JWT)
 
 **Machine Learning Engineering**
 - Training custom NER models
@@ -540,10 +794,19 @@ Building Pulse provided hands-on experience with:
 - Inference optimization
 - ML pipeline design
 
+**Security & Cryptography**
+- End-to-end encryption (ECDH + AES-GCM)
+- Key exchange protocols and key backup
+- Web Crypto API and native secure storage
+- Zero-knowledge server architecture
+
 **System Design**
 - Microservices architecture
 - Async programming
-- API integration
+- Cross-platform API design (web + mobile)
+- Real-time systems (WebSocket)
+- Media pipeline (Cloudinary)
+- API integration & third-party services
 - Caching strategies
 - Error handling and resilience
 
@@ -552,28 +815,40 @@ Building Pulse provided hands-on experience with:
 - MongoDB Atlas deployment
 - Service orchestration
 - API documentation
+- Expo EAS for mobile builds
 
 ---
 
 ## Future Enhancements
 
+### Completed
+- [x] WebSocket support for real-time updates
+- [x] User profile pictures and media uploads (Cloudinary)
+- [x] Direct messaging between users (E2EE)
+- [x] Notification system (Expo Push)
+- [x] Mobile app (React Native / Expo)
+- [x] Bookmarks, reposts, and quote reposts
+- [x] Dark mode and theme customization
+- [x] GIF support (Tenor integration)
+- [x] News and weather widgets
+- [x] Entity exploration / knowledge cards
+
 ### Short Term
-- [ ] WebSocket support for real-time updates
-- [ ] User profile pictures and media uploads
-- [ ] Direct messaging between users
-- [ ] Notification system
 - [ ] Post editing and versioning
+- [ ] Voice messages in E2EE chat
+- [ ] Read receipts for messages
+- [ ] Image/video sharing in DMs
 
 ### Medium Term
 - [ ] Admin moderation dashboard
 - [ ] User reporting and appeal system
 - [ ] Advanced search filters
 - [ ] Hashtag support (alongside entity-based trending)
-- [ ] Mobile app (React Native)
+- [ ] Stories / ephemeral content
 
 ### Long Term
 - [ ] Recommendation engine (collaborative filtering)
-- [ ] Video/image content moderation
+- [ ] Video/image content moderation (Vision AI)
 - [ ] Multi-model ensemble for better accuracy
 - [ ] Community-driven model improvement
 - [ ] Monetization features (ads, premium)
@@ -618,6 +893,9 @@ MONGO_URI=mongodb+srv://...
 SECRET_KEY=your_super_secret_key_here
 ML_SERVICE_URL=http://ml-service:9001/analyze
 CORS_ORIGINS=https://yourfrontend.com
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
 ```
 
 #### ML Service (.env)
@@ -625,6 +903,13 @@ CORS_ORIGINS=https://yourfrontend.com
 MODEL_PATH=./models/ner_model
 MAX_LENGTH=512
 BATCH_SIZE=32
+```
+
+#### Mobile (src/api/client.js)
+```bash
+BASE_URL=http://<your-LAN-IP>:8000   # For physical device
+# or http://localhost:8000             # For iOS simulator
+# or http://10.0.2.2:8000             # For Android emulator
 ```
 
 ---
