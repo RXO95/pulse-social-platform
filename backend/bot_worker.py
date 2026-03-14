@@ -1,16 +1,17 @@
-import os
 import sys
+import os
 import time
 import asyncio
 import schedule
 import requests
 import random
-from datetime import datetime
+from datetime import datetime, UTC
 
 # Add the parent directory to sys.path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app.services.database import client, DB_NAME
+from app.services.ml_client import analyze_text
 db = client.get_database(DB_NAME)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -105,11 +106,20 @@ async def generate_post():
     post_content = ask_llm(prompt)
     
     if post_content:
+        # Fetch the bot's user_id from the database
+        bot_user = await db.users.find_one({"username": bot_id})
+        if not bot_user:
+            print(f"Error: Bot user {bot_id} not found in DB.")
+            return
+            
         # 3. Create post in Database
         new_post = {
             "username": bot_id,
+            "user_id": str(bot_user["_id"]),
             "content": post_content,
             "likes": 0,
+            "comment_count": 0,
+            "repost_count": 0,
             "media_url": None,
             "created_at": datetime.utcnow()
         }
@@ -151,15 +161,16 @@ async def generate_replies():
                 # Fetch bot's user_id from DB
                 bot_user = await db.users.find_one({"username": bot_username})
                 if bot_user:
+                    analysis = await analyze_text(reply_text)
                     reply_doc = {
                         "post_id": post_id,
                         "user_id": str(bot_user["_id"]),
                         "username": bot_username,
                         "content": reply_text,
                         "gif_url": None,
-                        "entities": [],
+                        "entities": analysis.get("entities", []),
                         "likes": 0,
-                        "created_at": datetime.utcnow()
+                        "created_at": datetime.now(UTC)
                     }
                     await db.comments.insert_one(reply_doc)
                     
@@ -170,23 +181,34 @@ async def generate_replies():
                     )
                     print(f"✅ Replied to @{latest_comment['username']} as @{bot_username}")
 
-def job_post():
-    asyncio.run(generate_post())
-
-def job_reply():
-    asyncio.run(generate_replies())
-
-# Scheduler setup
-schedule.every(1).hours.do(job_post)
-schedule.every(5).minutes.do(job_reply)
-
-if __name__ == "__main__":
+async def main():
     print("🤖 Bot Backend Worker starting...")
     print(f"Available bots: {', '.join(BOTS.keys())}")
     
     # Run once at startup for testing
-    job_post()
+    await generate_post()
+    
+    last_post_time = time.time()
+    last_reply_time = time.time()
     
     while True:
-        schedule.run_pending()
-        time.sleep(1)
+        try:
+            current_time = time.time()
+            
+            # Every 1 hour (3600 seconds)
+            if current_time - last_post_time >= 3600:
+                await generate_post()
+                last_post_time = current_time
+                
+            # Every 5 minutes (300 seconds)
+            if current_time - last_reply_time >= 300:
+                await generate_replies()
+                last_reply_time = current_time
+                
+        except Exception as e:
+            print(f"Error in main loop: {e}")
+            
+        await asyncio.sleep(1)
+
+if __name__ == "__main__":
+    asyncio.run(main())
