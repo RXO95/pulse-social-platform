@@ -8,9 +8,10 @@ const BookmarkButton = ({ isBookmarked, onToggle }) => {
   const { darkMode, background } = useTheme();
   const t = getTheme(darkMode, background);
   const defaultColor = t.textSecondary || '#71767b';
+  const activeColor = t.accentBlue || '#1d9bf0';
 
   return (
-    <StyledWrapper $defaultColor={defaultColor} $active={isBookmarked}>
+    <StyledWrapper $defaultColor={defaultColor} $active={isBookmarked} $activeColor={activeColor}>
       <div className="action-row" onClick={onToggle}>
         <div title={isBookmarked ? "Remove bookmark" : "Bookmark"} className={`bookmark-container${isBookmarked ? ' active' : ''}`}>
           <div className="svg-container">
@@ -66,11 +67,11 @@ const StyledWrapper = styled.div`
   }
 
   .bookmark-container:hover .bookmark-icon {
-    fill: ${ACTIVE_COLOR};
+    fill: ${p => p.$activeColor};
   }
 
   .bookmark-container.active .bookmark-icon {
-    fill: ${ACTIVE_COLOR};
+    fill: ${p => p.$activeColor};
   }
 
   .action-row:active .bookmark-container {

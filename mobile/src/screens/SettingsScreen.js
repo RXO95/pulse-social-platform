@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Haptics from "expo-haptics";
 import { useTheme, getTheme, ACCENT_COLORS } from "../context/ThemeContext";
 
 export default function SettingsScreen({ navigation }) {
@@ -19,7 +20,7 @@ export default function SettingsScreen({ navigation }) {
     <SafeAreaView style={[styles.container, { backgroundColor: t.bg }]} edges={["top"]}>
       {/* Nav */}
       <View style={[styles.navBar, { backgroundColor: t.headerBg, borderColor: t.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Ionicons name="arrow-back" size={24} color={t.text} />
         </TouchableOpacity>
         <Text style={[styles.navTitle, { color: t.text }]}>Settings</Text>
@@ -64,7 +65,7 @@ export default function SettingsScreen({ navigation }) {
               <TouchableOpacity
                 key={preset.id}
                 style={styles.colorOption}
-                onPress={() => setAccentColor(preset.color)}
+                onPress={() => { Haptics.selectionAsync(); setAccentColor(preset.color); }}
                 activeOpacity={0.7}
               >
                 <View

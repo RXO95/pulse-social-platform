@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   ActivityIndicator,
   StyleSheet,
@@ -17,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as SecureStore from "expo-secure-store";
 import { Audio } from "expo-av";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
 import api, { BASE_URL } from "../api/client";
 import { timeAgo } from "../utils/helpers";
 import { encryptMessage, decryptMessage, getPublicKeyJwk, loadKeyPair } from "../utils/crypto";
@@ -39,6 +41,7 @@ async function playSound(file) {
 export default function ChatScreen({ route, navigation }) {
   const { otherUser } = route.params;
   const [convId, setConvId] = useState(route.params.conversationId);
+  const toast = useToast();
 
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState("");
@@ -178,7 +181,7 @@ export default function ChatScreen({ route, navigation }) {
     if (!draft.trim() || isSending) return;
 
     if (!recipientKey) {
-      alert("Recipient hasn't registered their encryption key yet.");
+      toast("Recipient hasn't registered their encryption key yet.", "warning");
       return;
     }
 
@@ -198,6 +201,7 @@ export default function ChatScreen({ route, navigation }) {
       setDecryptedCache((prev) => ({ ...prev, [res.data._id]: draft.trim() }));
       setMessages((prev) => [...prev, res.data]);
       setDraft("");
+      Keyboard.dismiss();
       playSound(sendSoundFile);
     } catch (err) {
       console.error("Send failed:", err);
@@ -318,6 +322,7 @@ export default function ChatScreen({ route, navigation }) {
           renderItem={renderMessage}
           contentContainerStyle={{ paddingHorizontal: 8, paddingVertical: 8 }}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: false })}
+          keyboardDismissMode="on-drag"
         />
 
         {/* Emoji picker */}
@@ -350,7 +355,7 @@ export default function ChatScreen({ route, navigation }) {
             style={st(t).emojiToggle}
             onPress={() => setShowEmoji((v) => !v)}
           >
-            <Ionicons name={showEmoji ? "close-circle" : "happy-outline"} size={26} color={showEmoji ? "#1d9bf0" : t.textSecondary} />
+            <Ionicons name={showEmoji ? "close-circle" : "happy-outline"} size={26} color={showEmoji ? (t.accentBlue || "#1d9bf0") : t.textSecondary} />
           </TouchableOpacity>
           <TextInput
             style={st(t).composeInput}
@@ -402,7 +407,7 @@ function MessageBubble({ msg, isMine, getDecryptedText, theme: t }) {
           borderRadius: 18,
           borderBottomRightRadius: isMine ? 4 : 18,
           borderBottomLeftRadius: isMine ? 18 : 4,
-          backgroundColor: isMine ? "#1d9bf0" : (t.cardBg || "#2f3336"),
+          backgroundColor: isMine ? (t.accentBlue || "#1d9bf0") : (t.cardBg || "#2f3336"),
         }}
       >
         <Text style={{ color: isMine ? "#fff" : t.text, fontSize: 15, lineHeight: 20 }}>
@@ -495,7 +500,7 @@ const st = (t) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: "#1d9bf0",
+      backgroundColor: t.accentBlue || "#1d9bf0",
       justifyContent: "center",
       alignItems: "center",
       marginLeft: 8,

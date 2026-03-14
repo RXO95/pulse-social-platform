@@ -121,6 +121,13 @@ const StyledWrapper = styled.div`
 
   .repost-container.active .repost-icon {
     fill: ${ACTIVE_COLOR};
+    animation: repost-pop 0.35s ease;
+  }
+
+  @keyframes repost-pop {
+    0% { transform: scale(0.7); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
   }
 
   .menu-backdrop {

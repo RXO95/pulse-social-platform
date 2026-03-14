@@ -1,22 +1,28 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { deriveBackupKey, ensureKeys } from "../utils/crypto";
 import Loader from "../components/Loader";
 import StarsBackground from "../components/StarsBackground";
 import PulseLogo from "../components/PulseLogo";
 
 export default function Login() {
+  const toast = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState(null);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const emailRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.style.backgroundColor = "transparent";
     document.body.style.backgroundColor = "transparent";
+    emailRef.current?.focus();
     return () => {
       document.documentElement.style.backgroundColor = "";
       document.body.style.backgroundColor = "";
@@ -35,7 +41,7 @@ export default function Login() {
       });
 
       if (!res.ok) {
-        alert("Invalid credentials");
+        toast("Invalid credentials", "error");
         setIsLoading(false);
         return;
       }
@@ -63,7 +69,7 @@ export default function Login() {
       navigate("/feed");
 
     } catch {
-      alert("Server error");
+      toast("Server error", "error");
     } finally {
       setIsLoading(false);
     }
@@ -83,24 +89,36 @@ export default function Login() {
             <div style={styles.inputGroup}>
               <label style={styles.label}>Email Address</label>
               <input
-                style={styles.input}
+                ref={emailRef}
+                style={{...styles.input, borderColor: focusedField === "email" ? "rgba(139, 92, 246, 0.6)" : "rgba(255, 255, 255, 0.1)"}}
                 placeholder="name@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onFocus={() => setFocusedField("email")}
+                onBlur={() => setFocusedField(null)}
                 required
               />
             </div>
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>Password</label>
-              <input
-                style={styles.input}
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <div style={{ position: "relative" }}>
+                <input
+                  style={{...styles.input, borderColor: focusedField === "password" ? "rgba(139, 92, 246, 0.6)" : "rgba(255, 255, 255, 0.1)", paddingRight: "44px"}}
+                  type={showPw ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setFocusedField("password")}
+                  onBlur={() => setFocusedField(null)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(!showPw)}
+                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4, color: "rgba(255,255,255,0.4)", fontSize: "13px", fontWeight: 500 }}
+                >{showPw ? "Hide" : "Show"}</button>
+              </div>
             </div>
 
             {isLoading ? (
@@ -115,12 +133,13 @@ export default function Login() {
           <div style={styles.footer}>
             <p style={styles.footerText}>
               Don't have an account?{" "}
-              <span 
+              <button 
+                type="button"
                 onClick={() => navigate("/signup")} 
-                style={styles.link}
+                style={{...styles.link, background: "none", border: "none", cursor: "pointer", fontSize: "inherit", fontFamily: "inherit", padding: 0}}
               >
                 Create one
-              </span>
+              </button>
             </p>
           </div>
         </div>

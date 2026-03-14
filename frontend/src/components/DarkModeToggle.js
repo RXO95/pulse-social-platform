@@ -77,7 +77,9 @@ export default function DarkModeToggle() {
           checked={darkMode}
           onChange={toggleDarkMode}
         />
-        <label htmlFor="dark-mode-toggle" />
+        <label htmlFor="dark-mode-toggle">
+          <span style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', borderWidth: 0 }}>Toggle dark mode</span>
+        </label>
       </div>
     </ToggleWrapper>
   );

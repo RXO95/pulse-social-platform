@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
 import { useTheme, getTheme } from '../context/ThemeContext';
 
-const LIKED_COLOR = '#F4212E'; // True red
+const LIKED_COLOR = '#f91880';
 
 const LikeButton = ({ isLiked, onLike, count }) => {
   const [justClicked, setJustClicked] = useState(false);
@@ -43,7 +43,7 @@ const LikeButton = ({ isLiked, onLike, count }) => {
             )}
           </div>
         </div>
-        <span className="like-count" style={isLiked ? {color: '#F4212E'} : undefined}>{count}</span>
+        <span className="like-count" style={isLiked ? {color: '#f91880'} : undefined}>{count}</span>
       </div>
     </StyledWrapper>
   );

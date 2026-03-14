@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -13,14 +13,19 @@ import {
   Pressable,
   StyleSheet,
   Dimensions,
+  Animated,
+  Share,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
+import * as Haptics from "expo-haptics";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
 import GifPicker from "../components/GifPicker";
 import api from "../api/client";
 import { timeAgo } from "../utils/helpers";
+import { parseContent } from "../utils/parseContent";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
@@ -64,8 +69,29 @@ export default function FeedScreen({ navigation }) {
   const [quoteContent, setQuoteContent] = useState("");
   const [isQuoting, setIsQuoting] = useState(false);
 
+  // Edit post state
+  const [editPostId, setEditPostId] = useState(null);
+  const [editContent, setEditContent] = useState("");
+  const [isEditSaving, setIsEditSaving] = useState(false);
+
+  // Drafts state
+  const [drafts, setDrafts] = useState([]);
+  const [showDrafts, setShowDrafts] = useState(false);
+
+  // Double-tap to like
+  const lastTapRef = useRef({});
+  const heartScale = useRef(new Animated.Value(0)).current;
+  const [doubleTapPostId, setDoubleTapPostId] = useState(null);
+
+  // Scroll-to-top & new posts banner
+  const flatListRef = useRef(null);
+  const [hasNewPosts, setHasNewPosts] = useState(false);
+  const latestPostIdRef = useRef(null);
+  const searchTimerRef = useRef(null);
+
   const { darkMode, accentColor } = useTheme();
   const t = getTheme(darkMode, accentColor);
+  const toast = useToast();
 
   // ─── Fetch Data ───
   const fetchCurrentUser = async () => {
@@ -87,7 +113,7 @@ export default function FeedScreen({ navigation }) {
         }))
       );
     } catch {
-      Alert.alert("Error", "Failed to load feed");
+      toast("Failed to load feed", "error");
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +128,106 @@ export default function FeedScreen({ navigation }) {
   useEffect(() => {
     fetchCurrentUser();
     fetchPosts();
+    fetchDrafts();
   }, []);
+
+  // Track latest post ID for new-posts banner
+  useEffect(() => {
+    if (posts.length > 0) {
+      latestPostIdRef.current = posts[0]._id;
+    }
+  }, [posts]);
+
+  // Poll for new posts every 30s
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (!latestPostIdRef.current || searchQuery) return;
+      try {
+        const res = await api.get("/feed/latest-id");
+        const latestId = res.data?.latest_id;
+        if (latestId && latestId !== latestPostIdRef.current) {
+          setHasNewPosts(true);
+        }
+      } catch {}
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [searchQuery]);
+
+  // ─── Double-tap to like ───
+  const handleCardPress = (postId) => {
+    const now = Date.now();
+    const lastTap = lastTapRef.current[postId] || 0;
+
+    if (now - lastTap < 300) {
+      // Double tap → like
+      clearTimeout(lastTapRef.current[`${postId}_t`]);
+      const post = posts.find((p) => p._id === postId);
+      if (post && !post.is_liked_by_user) {
+        handleLike(postId);
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setDoubleTapPostId(postId);
+      heartScale.setValue(0);
+      Animated.sequence([
+        Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, friction: 3 }),
+        Animated.delay(600),
+        Animated.timing(heartScale, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start(() => setDoubleTapPostId(null));
+      lastTapRef.current[postId] = 0;
+    } else {
+      lastTapRef.current[postId] = now;
+      lastTapRef.current[`${postId}_t`] = setTimeout(() => {
+        if (lastTapRef.current[postId] === now) {
+          navigation.navigate("PostDetail", { postId });
+          lastTapRef.current[postId] = 0;
+        }
+      }, 280);
+    }
+  };
+
+  // ─── Share post ───
+  const handleShare = async (postId) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await Share.share({
+        message: `https://webpulse.social/post/${postId}`,
+        url: `https://webpulse.social/post/${postId}`,
+      });
+    } catch {}
+  };
+
+  // ─── Skeleton loader ───
+  const SkeletonPost = () => {
+    const shimmer = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmer, { toValue: 1, duration: 1000, useNativeDriver: true }),
+          Animated.timing(shimmer, { toValue: 0, duration: 1000, useNativeDriver: true }),
+        ])
+      ).start();
+    }, []);
+    const opacity = shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.7] });
+    return (
+      <View style={[styles.postCard, { backgroundColor: t.cardBg, borderColor: t.border }]}>
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+          <Animated.View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: t.border, opacity }} />
+          <View style={{ marginLeft: 10, flex: 1 }}>
+            <Animated.View style={{ width: 100, height: 14, borderRadius: 6, backgroundColor: t.border, opacity, marginBottom: 6 }} />
+            <Animated.View style={{ width: 60, height: 10, borderRadius: 6, backgroundColor: t.border, opacity }} />
+          </View>
+        </View>
+        <Animated.View style={{ width: "100%", height: 14, borderRadius: 6, backgroundColor: t.border, opacity, marginBottom: 8 }} />
+        <Animated.View style={{ width: "80%", height: 14, borderRadius: 6, backgroundColor: t.border, opacity, marginBottom: 8 }} />
+        <Animated.View style={{ width: "55%", height: 14, borderRadius: 6, backgroundColor: t.border, opacity, marginBottom: 12 }} />
+        <View style={{ flexDirection: "row", gap: 24, marginTop: 4, paddingTop: 10, borderTopWidth: 0.5, borderColor: t.border }}>
+          <Animated.View style={{ width: 40, height: 16, borderRadius: 6, backgroundColor: t.border, opacity }} />
+          <Animated.View style={{ width: 40, height: 16, borderRadius: 6, backgroundColor: t.border, opacity }} />
+          <Animated.View style={{ width: 40, height: 16, borderRadius: 6, backgroundColor: t.border, opacity }} />
+        </View>
+      </View>
+    );
+  };
 
   // ─── Actions ───
   const pickImage = async () => {
@@ -151,7 +276,7 @@ export default function FeedScreen({ navigation }) {
       setSelectedGif(null);
       fetchPosts(false);
     } catch {
-      Alert.alert("Error", "Failed to create post");
+      toast("Failed to create post", "error");
     } finally {
       setIsPosting(false);
     }
@@ -161,6 +286,7 @@ export default function FeedScreen({ navigation }) {
     const post = posts.find((p) => p._id === postId);
     if (!post) return;
     const wasLiked = post.is_liked_by_user;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     setPosts((prev) =>
       prev.map((p) =>
@@ -195,6 +321,7 @@ export default function FeedScreen({ navigation }) {
   };
 
   const handleBookmark = async (postId) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       const res = await api.post(`/bookmarks/${postId}`);
       setPosts((prev) =>
@@ -202,7 +329,9 @@ export default function FeedScreen({ navigation }) {
           p._id === postId ? { ...p, is_bookmarked: res.data.bookmarked } : p
         )
       );
-    } catch {}
+    } catch {
+      toast("Bookmark failed", "error");
+    }
   };
 
   const handleRepost = async (postId) => {
@@ -268,24 +397,27 @@ export default function FeedScreen({ navigation }) {
       setQuoteContent("");
       fetchPosts(false);
     } catch (err) {
-      Alert.alert("Error", err.response?.data?.detail || "Failed to quote repost");
+      toast(err.response?.data?.detail || "Failed to quote repost", "error");
     } finally {
       setIsQuoting(false);
     }
   };
 
-  const handleSearch = async (query) => {
+  const handleSearch = (query) => {
     setSearchQuery(query);
+    clearTimeout(searchTimerRef.current);
     if (!query.trim()) {
       fetchPosts(false);
       return;
     }
-    try {
-      const res = await api.get(`/search/?q=${encodeURIComponent(query)}`);
-      setPosts(res.data.results || []);
-    } catch {
-      Alert.alert("Error", "Search failed");
-    }
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await api.get(`/search/?q=${encodeURIComponent(query)}`);
+        setPosts(res.data.results || []);
+      } catch {
+        toast("Search failed", "error");
+      }
+    }, 350);
   };
 
   const handleDelete = async (postId) => {
@@ -300,11 +432,70 @@ export default function FeedScreen({ navigation }) {
             await api.delete(`/posts/${postId}`);
             setPosts((prev) => prev.filter((p) => p._id !== postId));
           } catch {
-            Alert.alert("Error", "Failed to delete post");
+            toast("Failed to delete post", "error");
           }
         },
       },
     ]);
+  };
+
+  // ─── Edit Post ───
+  const openEditModal = (post) => {
+    setMenuPostId(null);
+    setEditPostId(post._id);
+    setEditContent(post.content || "");
+  };
+
+  const handleEditPost = async () => {
+    if (!editContent.trim() || !editPostId) return;
+    setIsEditSaving(true);
+    try {
+      await api.put(`/posts/${editPostId}`, { content: editContent.trim() });
+      setPosts((prev) =>
+        prev.map((p) =>
+          p._id === editPostId
+            ? { ...p, content: editContent.trim(), is_edited: true }
+            : p
+        )
+      );
+      setEditPostId(null);
+      setEditContent("");
+    } catch (err) {
+      toast(err.response?.data?.detail?.message || err.response?.data?.detail || "Failed to edit post", "error");
+    } finally {
+      setIsEditSaving(false);
+    }
+  };
+
+  // ─── Drafts ───
+  const fetchDrafts = async () => {
+    try {
+      const res = await api.get("/drafts/");
+      setDrafts(res.data);
+    } catch {}
+  };
+
+  const saveDraft = async () => {
+    if (!content.trim() && !selectedGif) return;
+    try {
+      await api.post("/drafts/", { content: content.trim(), gif_url: selectedGif?.url || null });
+      setContent("");
+      setSelectedGif(null);
+      setSelectedImage(null);
+      fetchDrafts();
+      toast("Draft saved", "success");
+    } catch { toast("Could not save draft", "error"); }
+  };
+
+  const loadDraft = (draft) => {
+    setContent(draft.content || "");
+    if (draft.gif_url) setSelectedGif({ url: draft.gif_url, preview: draft.gif_url });
+    setShowDrafts(false);
+    api.delete(`/drafts/${draft._id}`).then(() => fetchDrafts()).catch(() => {});
+  };
+
+  const deleteDraft = (draftId) => {
+    api.delete(`/drafts/${draftId}`).then(() => fetchDrafts()).catch(() => {});
   };
 
   const handleFollowToggle = async (postAuthorId, isFollowing) => {
@@ -362,7 +553,7 @@ export default function FeedScreen({ navigation }) {
         return updated;
       });
     } catch {
-      Alert.alert("Error", "Translation failed");
+      toast("Translation failed", "error");
     }
   };
 
@@ -373,10 +564,8 @@ export default function FeedScreen({ navigation }) {
     const isOtherUser = currentUser && post.username !== currentUser.username;
 
     return (
-      <TouchableOpacity
+      <View
         style={[styles.postCard, { backgroundColor: t.cardBg, borderColor: t.border }]}
-        activeOpacity={0.8}
-        onPress={() => navigation.navigate("PostDetail", { postId: post._id })}
       >
         {/* Header */}
         <View style={styles.postHeader}>
@@ -448,29 +637,55 @@ export default function FeedScreen({ navigation }) {
           )}
         </View>
 
-        {/* Content */}
-        <Text style={[styles.postContent, { color: t.text }]}>
-          {post.showTranslation ? post.translatedText : post.content}
-        </Text>
+        {/* Double-tap zone: Content + Media */}
+        <Pressable onPress={() => handleCardPress(post._id)} style={{ position: "relative" }}>
+          {/* Content */}
+          <Text style={[styles.postContent, { color: t.text }]}>
+            {parseContent(post.showTranslation ? post.translatedText : post.content, { navigation, accentColor: t.accentBlue })}
+            {post.is_edited && (
+              <Text style={{ fontSize: 12, fontStyle: "italic", color: t.textSecondary }}> (edited)</Text>
+            )}
+          </Text>
 
-        {/* Media */}
-        {post.media_url && (
-          <Image
-            source={{ uri: post.media_url }}
-            style={styles.postMedia}
-            resizeMode="cover"
-          />
-        )}
+          {/* Media */}
+          {post.media_url && (
+            <Image
+              source={{ uri: post.media_url }}
+              style={styles.postMedia}
+              resizeMode="cover"
+            />
+          )}
 
-        {/* GIF */}
-        {post.gif_url && !post.media_url && (
-          <View style={styles.gifPostWrap}>
-            <AutoGif uri={post.gif_url} style={styles.postMediaGif} />
-            <View style={styles.gifPostBadge}>
-              <Text style={styles.gifBadgeText}>GIF</Text>
+          {/* GIF */}
+          {post.gif_url && !post.media_url && (
+            <View style={styles.gifPostWrap}>
+              <AutoGif uri={post.gif_url} style={styles.postMediaGif} />
+              <View style={styles.gifPostBadge}>
+                <Text style={styles.gifBadgeText}>GIF</Text>
+              </View>
             </View>
-          </View>
-        )}
+          )}
+
+          {/* Heart overlay animation */}
+          {doubleTapPostId === post._id && (
+            <Animated.View
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                justifyContent: "center",
+                alignItems: "center",
+                transform: [{ scale: heartScale }],
+                opacity: heartScale,
+              }}
+            >
+              <Ionicons name="heart" size={80} color="#f91880" />
+            </Animated.View>
+          )}
+        </Pressable>
 
         {/* Translate button */}
         <TouchableOpacity
@@ -600,8 +815,15 @@ export default function FeedScreen({ navigation }) {
               color={post.is_bookmarked ? t.accentBlue : t.textSecondary}
             />
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => handleShare(post._id)}
+          >
+            <Ionicons name="share-outline" size={20} color={t.textSecondary} />
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -642,8 +864,13 @@ export default function FeedScreen({ navigation }) {
           value={content}
           onChangeText={setContent}
           multiline
-          maxLength={500}
+          maxLength={1000}
         />
+        {content.length > 0 && (
+          <Text style={{ textAlign: "right", fontSize: 12, color: content.length > 900 ? (content.length > 980 ? "#f4212e" : "#ff9800") : t.textSecondary, marginTop: -4, marginBottom: 4, opacity: 0.8 }}>
+            {content.length}/1000
+          </Text>
+        )}
 
         {/* Image / GIF preview */}
         {selectedImage && (
@@ -675,19 +902,31 @@ export default function FeedScreen({ navigation }) {
             <TouchableOpacity onPress={() => setShowGifPicker(true)} style={[styles.toolBtn, styles.gifBtn]}>
               <Text style={[styles.gifLabel, { color: t.accentBlue, borderColor: t.accentBlue }]}>GIF</Text>
             </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            style={[styles.postButton, (!content.trim() && !selectedImage && !selectedGif) && styles.postButtonDisabled]}
-            onPress={handlePost}
-            disabled={(!content.trim() && !selectedImage && !selectedGif) || isPosting}
-            activeOpacity={0.8}
-          >
-            {isPosting ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.postButtonText}>Post</Text>
+            {drafts.length > 0 && (
+              <TouchableOpacity onPress={() => setShowDrafts(true)} style={styles.toolBtn}>
+                <Text style={{ fontSize: 12, color: t.accentBlue, fontWeight: "600" }}>Drafts ({drafts.length})</Text>
+              </TouchableOpacity>
             )}
-          </TouchableOpacity>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {(content.trim() || selectedGif) && (
+              <TouchableOpacity onPress={saveDraft} style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
+                <Text style={{ color: t.textSecondary, fontSize: 13, fontWeight: "600" }}>Draft</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[styles.postButton, { backgroundColor: t.accentBlue }, (!content.trim() && !selectedImage && !selectedGif) && styles.postButtonDisabled]}
+              onPress={handlePost}
+              disabled={(!content.trim() && !selectedImage && !selectedGif) || isPosting}
+              activeOpacity={0.8}
+            >
+              {isPosting ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.postButtonText}>Post</Text>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </View>
@@ -695,22 +934,43 @@ export default function FeedScreen({ navigation }) {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: t.bg }]} edges={["top"]}>
-      {/* Nav Header */}
-      <View
+      {/* Nav Header – tap to scroll to top */}
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => flatListRef.current?.scrollToOffset({ offset: 0, animated: true })}
         style={[styles.navBar, { backgroundColor: t.headerBg, borderColor: t.border }]}
       >
         <Text style={[styles.navTitle, { color: t.text }]}>Pulse</Text>
         <TouchableOpacity onPress={() => navigation.navigate("Notifications")} hitSlop={12}>
           <Ionicons name="notifications-outline" size={24} color={t.text} />
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
+
+      {/* New posts available banner */}
+      {hasNewPosts && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          style={[styles.newPostsBanner, { backgroundColor: t.accentBlue }]}
+          onPress={() => {
+            setHasNewPosts(false);
+            onRefresh();
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+          }}
+        >
+          <Ionicons name="arrow-up" size={14} color="#fff" />
+          <Text style={styles.newPostsBannerText}>New posts available</Text>
+        </TouchableOpacity>
+      )}
 
       {isLoading ? (
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="large" color={t.accentBlue} />
+        <View style={{ flex: 1, paddingTop: 12 }}>
+          <SkeletonPost />
+          <SkeletonPost />
+          <SkeletonPost />
         </View>
       ) : (
         <FlatList
+          ref={flatListRef}
           data={posts}
           keyExtractor={(item) => item._id}
           renderItem={renderPost}
@@ -750,11 +1010,29 @@ export default function FeedScreen({ navigation }) {
       <Modal
         visible={!!menuPostId}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setMenuPostId(null)}
       >
         <Pressable style={styles.menuOverlay} onPress={() => setMenuPostId(null)}>
           <View style={[styles.menuSheet, { backgroundColor: t.cardBg }]}>
+            {/* Edit Post - only for own posts (not admin deleting others) */}
+            {(() => {
+              const menuPost = posts.find(p => p._id === menuPostId);
+              if (menuPost && currentUser && menuPost.username === currentUser.username) {
+                return (
+                  <TouchableOpacity
+                    style={styles.menuSheetItem}
+                    onPress={() => openEditModal(menuPost)}
+                  >
+                    <Ionicons name="create-outline" size={20} color={t.accentBlue} />
+                    <Text style={[styles.menuSheetText, { color: t.text }]}>
+                      Edit Post
+                    </Text>
+                  </TouchableOpacity>
+                );
+              }
+              return null;
+            })()}
             <TouchableOpacity
               style={styles.menuSheetItem}
               onPress={() => handleDelete(menuPostId)}
@@ -781,7 +1059,7 @@ export default function FeedScreen({ navigation }) {
       <Modal
         visible={!!repostMenuPostId}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setRepostMenuPostId(null)}
       >
         <Pressable style={styles.menuOverlay} onPress={() => setRepostMenuPostId(null)}>
@@ -839,15 +1117,20 @@ export default function FeedScreen({ navigation }) {
               value={quoteContent}
               onChangeText={setQuoteContent}
               multiline
-              maxLength={500}
+              maxLength={1000}
             />
+            {quoteContent.length > 0 && (
+              <Text style={{ textAlign: "right", fontSize: 12, color: quoteContent.length > 900 ? (quoteContent.length > 980 ? "#f4212e" : "#ff9800") : t.textSecondary, marginTop: 2, opacity: 0.8 }}>
+                {quoteContent.length}/1000
+              </Text>
+            )}
             {(() => {
               const qPost = posts.find(p => p._id === quotePostId);
               if (!qPost) return null;
               return (
                 <View style={[styles.quotePreview, { borderColor: t.border }]}>  
                   <Text style={[styles.quotePreviewUser, { color: t.accent }]}>@{qPost.username}</Text>
-                  <Text style={[styles.quotePreviewText, { color: t.textSecondary }]} numberOfLines={3}>{qPost.content}</Text>
+                  <Text style={[styles.quotePreviewText, { color: t.textSecondary }]} numberOfLines={3}>{parseContent(qPost.content, { navigation, accentColor: t.accentBlue })}</Text>
                 </View>
               );
             })()}
@@ -860,6 +1143,82 @@ export default function FeedScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* Edit post modal */}
+      <Modal
+        visible={!!editPostId}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditPostId(null)}
+      >
+        <View style={[styles.quoteOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+          <View style={[styles.quoteSheet, { backgroundColor: t.cardBg }]}>
+            <View style={styles.quoteHeader}>
+              <Text style={[styles.quoteTitle, { color: t.text }]}>Edit Post</Text>
+              <TouchableOpacity onPress={() => setEditPostId(null)}>
+                <Ionicons name="close" size={24} color={t.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={[styles.quoteInput, { color: t.text, borderColor: t.border, minHeight: 120 }]}
+              placeholder="Edit your post..."
+              placeholderTextColor={t.textSecondary}
+              value={editContent}
+              onChangeText={setEditContent}
+              multiline
+              autoFocus
+            />
+            <TouchableOpacity
+              style={[styles.quoteSubmitBtn, { opacity: editContent.trim() ? 1 : 0.5 }]}
+              onPress={handleEditPost}
+              disabled={!editContent.trim() || isEditSaving}
+            >
+              <Text style={styles.quoteSubmitText}>{isEditSaving ? "Saving..." : "Save"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Drafts bottom sheet */}
+      <Modal
+        visible={showDrafts}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDrafts(false)}
+      >
+        <Pressable style={styles.menuOverlay} onPress={() => setShowDrafts(false)}>
+          <View style={[styles.menuSheet, { backgroundColor: t.cardBg, maxHeight: 400 }]}>
+            <Text style={{ fontSize: 16, fontWeight: "700", color: t.text, padding: 16, borderBottomWidth: 1, borderBottomColor: t.border }}>
+              Your Drafts
+            </Text>
+            {drafts.length === 0 ? (
+              <Text style={{ color: t.textSecondary, padding: 16, textAlign: "center" }}>No drafts saved</Text>
+            ) : (
+              drafts.map((d) => (
+                <View key={d._id} style={{ flexDirection: "row", alignItems: "center", padding: 14, borderBottomWidth: 1, borderBottomColor: t.border }}>
+                  <TouchableOpacity style={{ flex: 1 }} onPress={() => loadDraft(d)}>
+                    <Text style={{ color: t.text, fontSize: 14 }} numberOfLines={2}>
+                      {d.content || "(GIF only)"}
+                    </Text>
+                    <Text style={{ color: t.textSecondary, fontSize: 11, marginTop: 4 }}>
+                      Tap to load
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => deleteDraft(d._id)} style={{ padding: 8 }}>
+                    <Ionicons name="trash-outline" size={18} color={t.riskText} />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+            <TouchableOpacity
+              style={[styles.menuSheetItem, { borderBottomWidth: 0 }]}
+              onPress={() => setShowDrafts(false)}
+            >
+              <Text style={[styles.menuSheetText, { color: t.textSecondary }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );
@@ -981,7 +1340,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   postButton: {
-    backgroundColor: "#1d9bf0",
     borderRadius: 9999,
     paddingVertical: 10,
     paddingHorizontal: 24,
@@ -1014,13 +1372,15 @@ const styles = StyleSheet.create({
   username: { fontWeight: "700", fontSize: 15 },
   timestamp: { fontSize: 12, marginLeft: 4 },
   followBtnSmall: {
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 9999,
     alignSelf: "flex-start",
     marginTop: 3,
+    minHeight: 32,
+    justifyContent: "center",
   },
-  menuBtn: { padding: 6 },
+  menuBtn: { padding: 10 },
 
   postContent: { fontSize: 15, lineHeight: 22, marginBottom: 8 },
   postMedia: { width: "100%", height: 200, borderRadius: 12, marginBottom: 8 },
@@ -1057,6 +1417,32 @@ const styles = StyleSheet.create({
   emptyWrap: { alignItems: "center", marginTop: 60 },
   emptyText: { marginTop: 12, fontSize: 15 },
 
+  newPostsBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    marginHorizontal: 40,
+    marginTop: 8,
+    borderRadius: 9999,
+    position: "absolute",
+    top: 60,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  newPostsBannerText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
   // Menu modal
   menuOverlay: {
     flex: 1,
@@ -1076,7 +1462,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     gap: 12,
     borderBottomWidth: 0.5,
-    borderColor: "rgba(128,128,128,0.2)",
+    borderColor: "rgba(128,128,128,0.15)",
   },
   menuSheetText: { fontSize: 16, fontWeight: "600" },
   quoteOverlay: { flex: 1, justifyContent: "center", alignItems: "center" },

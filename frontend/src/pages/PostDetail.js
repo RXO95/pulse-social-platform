@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../context/ConfirmContext";
+import { parseContent } from "../utils/parseContent";
 import LikeButton from "../components/LikeButton";
 import CommentButton from "../components/CommentButton";
 import BookmarkButton from "../components/BookmarkButton";
@@ -11,8 +14,11 @@ import DarkModeToggle from "../components/DarkModeToggle";
 
 import Loader from "../components/Loader";
 import useIsMobile from "../hooks/useIsMobile";
+import { timeAgo } from "../utils/timeAgo";
 
 export default function PostDetail() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const { postId } = useParams();
   const navigate = useNavigate();
   const [post, setPost] = useState(null);
@@ -48,7 +54,7 @@ export default function PostDetail() {
         setPost(data);
       } else {
         setLoadError(true);
-        alert("Post not found");
+        toast("Post not found", "error");
         navigate("/feed");
       }
     } catch {
@@ -154,13 +160,14 @@ export default function PostDetail() {
         fetchNotes();
       }
     } catch {
-      alert("Failed to add comment");
+      toast("Failed to add comment", "error");
     }
   };
 
   // Delete a Comment
   const handleDeleteComment = async (commentId) => {
-    if (!window.confirm("Delete this comment?")) return;
+    const ok = await confirm("Delete this comment?", { title: "Delete Comment", confirmText: "Delete" });
+    if (!ok) return;
     try {
       const res = await fetch(`${API}/comments/${commentId}`, {
         method: "DELETE",
@@ -170,7 +177,7 @@ export default function PostDetail() {
         setNotes(prev => prev.filter(n => n._id !== commentId));
       }
     } catch {
-      alert("Failed to delete comment");
+      toast("Failed to delete comment", "error");
     }
   };
 
@@ -281,7 +288,7 @@ export default function PostDetail() {
         setShowTranslation(true);
       }
     } catch {
-      alert("Translation failed");
+      toast("Translation failed", "error");
     }
   };
 
@@ -302,10 +309,10 @@ export default function PostDetail() {
         }));
       } else {
         const error = await res.json();
-        alert(error.detail || "Failed to regenerate context");
+        toast(error.detail || "Failed to regenerate context", "error");
       }
     } catch {
-      alert("Failed to regenerate context");
+      toast("Failed to regenerate context", "error");
     } finally {
       setIsRegeneratingContext(false);
     }
@@ -467,7 +474,8 @@ export default function PostDetail() {
         
         {/* --- UPDATED: Content with Translation Toggle --- */}
         <p style={styles.content}>
-          {showTranslation ? translatedText : post.content}
+          {parseContent(showTranslation ? translatedText : post.content, { navigate, accentColor: t.accentBlue })}
+          {post.is_edited && <span style={{ fontSize: "12px", fontStyle: "italic", color: t.textSecondary, marginLeft: "6px" }}>(edited)</span>}
         </p>
 
         {/* --- POST MEDIA --- */}
@@ -544,9 +552,18 @@ export default function PostDetail() {
           <textarea
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
+            onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); handleSubmitNote(); } }}
             placeholder="Add a comment..."
+            maxLength={500}
             style={styles.textarea}
+            onFocus={(e) => { e.target.style.borderColor = t.accentBlue; }}
+            onBlur={(e) => { e.target.style.borderColor = t.inputBorder; }}
           />
+          {newNote.length > 0 && (
+            <div style={{ textAlign: "right", fontSize: "12px", color: newNote.length > 450 ? (newNote.length > 490 ? "#f4212e" : "#ff9800") : t.textSecondary, marginTop: "2px", marginBottom: "4px", opacity: 0.8 }}>
+              {newNote.length}/500
+            </div>
+          )}
           {commentGifUrl && (
             <div style={{position: "relative", borderRadius: "12px", overflow: "hidden", maxWidth: "200px", marginBottom: "8px"}}>
               <img src={commentGifUrl} alt="GIF" style={{width: "100%", borderRadius: "12px"}} />
@@ -562,13 +579,23 @@ export default function PostDetail() {
         <div style={styles.notesList}>
           {notes.map((note) => (
             <div key={note._id} style={styles.noteCard}>
+              <div style={{display: "flex", gap: "10px"}}>
+                <div
+                  style={{width: "32px", height: "32px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "700", fontSize: "13px", color: "#1a1a1a", flexShrink: 0, cursor: "pointer"}}
+                  onClick={() => navigate(`/profile/${note.username}`)}
+                >
+                  {note.profile_pic_url
+                    ? <img src={note.profile_pic_url} alt="" style={{width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover"}} />
+                    : (note.username || "?").charAt(0).toUpperCase()}
+                </div>
+                <div style={{flex: 1}}>
               <div style={styles.noteHeader}>
                 <strong 
                   style={{cursor: "pointer"}}
                   onClick={() => navigate(`/profile/${note.username}`)}
                 >@{note.username}</strong>
                 <div style={{display: "flex", alignItems: "center", gap: "8px"}}>
-                  <small style={{color: t.textSecondary}}>{new Date(note.created_at).toLocaleDateString()}</small>
+                  <small style={{color: t.textSecondary}}>{timeAgo(note.created_at)}</small>
                   {currentUser && currentUser.username === note.username && (
                     <button
                       onClick={() => handleDeleteComment(note._id)}
@@ -582,7 +609,7 @@ export default function PostDetail() {
                   )}
                 </div>
               </div>
-              {note.content && <p style={{margin:"5px 0", fontSize:"14px", color: t.text, wordBreak: "break-word"}}>{note.content}</p>}
+              {note.content && <p style={{margin:"5px 0", fontSize:"14px", color: t.text, wordBreak: "break-word"}}>{parseContent(note.content, { navigate, accentColor: t.accentBlue })}</p>}
               {note.gif_url && (
                 <img src={note.gif_url} alt="GIF" style={{maxWidth: "200px", borderRadius: "12px", marginTop: "6px"}} />
               )}
@@ -590,12 +617,12 @@ export default function PostDetail() {
               <div style={styles.commentActions}>
                 {/* Like */}
                 <div
-                  style={{...styles.commentActionBtn, color: note.is_liked_by_user ? "#F4212E" : t.textSecondary}}
+                  style={{...styles.commentActionBtn, color: note.is_liked_by_user ? "#f91880" : t.textSecondary}}
                   onClick={() => handleCommentLike(note._id)}
                   title="Like"
                 >
                   {note.is_liked_by_user ? (
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="#F4212E">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="#f91880">
                       <path d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.98C3.907 4.19 6.043 3 8.399 3c1.837 0 3.238.84 4.1 1.78A5.61 5.61 0 0 1 16.6 3c2.358 0 4.494 1.19 5.617 3.21 1.116 2.06 1.026 4.48-.333 6.98z"/>
                     </svg>
                   ) : (
@@ -620,12 +647,12 @@ export default function PostDetail() {
                 </div>
                 {/* Bookmark */}
                 <div
-                  style={{...styles.commentActionBtn, color: note.is_bookmarked_by_user ? "#1d9bf0" : t.textSecondary}}
+                  style={{...styles.commentActionBtn, color: note.is_bookmarked_by_user ? t.accentBlue : t.textSecondary}}
                   onClick={() => handleCommentBookmark(note._id)}
                   title={note.is_bookmarked_by_user ? "Remove bookmark" : "Bookmark"}
                 >
                   {note.is_bookmarked_by_user ? (
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="#1d9bf0">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill={t.accentBlue}>
                       <path d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5z"/>
                     </svg>
                   ) : (
@@ -636,6 +663,8 @@ export default function PostDetail() {
                 </div>
               </div>
             </div>
+                </div>
+              </div>
           ))}
           {notes.length === 0 && <p style={{color: t.textSecondary, fontStyle:"italic"}}>No comments yet.</p>}
         </div>
@@ -746,7 +775,7 @@ function getStyles(t, m, bg) { const glass = bg && bg !== "none"; return {
   notesSection: { marginTop: "0", borderTop: `1px solid ${glass ? "rgba(255,255,255,0.1)" : t.border}`, padding: m ? "16px" : "20px" },
   sectionTitle: { fontSize: "18px", fontWeight: "700", marginBottom: "16px", color: t.text },
   inputGroup: { display: "flex", flexDirection: "column", gap: "10px", marginBottom: "20px" },
-  textarea: { padding: "14px", borderRadius: "12px", border: `1px solid ${t.inputBorder}`, resize: "none", height: "64px", fontFamily: "inherit", backgroundColor: t.inputBg, color: t.text, transition: "background-color 0.3s, border-color 0.2s", fontSize: "15px", outline: "none" },
+  textarea: { padding: "14px", borderRadius: "12px", border: `1px solid ${t.inputBorder}`, resize: "vertical", minHeight: "64px", maxHeight: "200px", fontFamily: "inherit", backgroundColor: t.inputBg, color: t.text, transition: "background-color 0.3s, border-color 0.2s", fontSize: "15px", outline: "none" },
   postBtn: { alignSelf: "flex-end", backgroundColor: t.accentBlue, color: "#fff", border: "none", padding: "10px 24px", borderRadius: "9999px", fontWeight: "700", fontSize: "15px", cursor: "pointer", transition: "all 0.2s" },
   
   notesList: { display: "flex", flexDirection: "column", gap: "0" },

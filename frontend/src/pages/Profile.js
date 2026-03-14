@@ -3,13 +3,20 @@ import { useParams, useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
+import { parseContent } from "../utils/parseContent";
 import DarkModeToggle from "../components/DarkModeToggle";
+import LikeButton from "../components/LikeButton";
+import CommentButton from "../components/CommentButton";
+import BookmarkButton from "../components/BookmarkButton";
+import RepostButton from "../components/RepostButton";
 
 import Loader from "../components/Loader";
 import PostLoader from "../components/PostLoader";
 import useIsMobile from "../hooks/useIsMobile";
 
 export default function Profile() {
+  const toast = useToast();
   const { username } = useParams();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
@@ -105,7 +112,7 @@ export default function Profile() {
         fetchProfile(); // Refresh stats and button state
       }
     } catch {
-      alert("Action failed");
+      toast("Action failed", "error");
     }
   };
 
@@ -134,6 +141,134 @@ export default function Profile() {
     setEditPicture(null);
     setPicturePreview(profile.profile_pic_url || null);
     setIsEditing(true);
+  };
+
+  // --- Action handlers for posts ---
+  const handleLike = async (postId) => {
+    const post = posts.find(p => p._id === postId);
+    if (!post) return;
+    const wasLiked = post.is_liked_by_user;
+    setPosts(prev => prev.map(p =>
+      p._id === postId ? { ...p, is_liked_by_user: !wasLiked, likes: wasLiked ? p.likes - 1 : p.likes + 1 } : p
+    ));
+    try {
+      const res = await fetch(`${API}/likes/${postId}`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPosts(prev => prev.map(p =>
+          p._id === postId ? { ...p, is_liked_by_user: data.liked, likes: data.likes } : p
+        ));
+      } else {
+        setPosts(prev => prev.map(p =>
+          p._id === postId ? { ...p, is_liked_by_user: wasLiked, likes: post.likes } : p
+        ));
+      }
+    } catch {
+      setPosts(prev => prev.map(p =>
+        p._id === postId ? { ...p, is_liked_by_user: wasLiked, likes: post.likes } : p
+      ));
+    }
+  };
+
+  const handleBookmark = async (postId) => {
+    try {
+      const res = await fetch(`${API}/bookmarks/${postId}`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPosts(prev => prev.map(p =>
+          p._id === postId ? { ...p, is_bookmarked: data.bookmarked } : p
+        ));
+      }
+    } catch {
+      toast("Bookmark failed", "error");
+    }
+  };
+
+  const handleRepost = async (postId) => {
+    const post = posts.find(p => p._id === postId);
+    if (!post) return;
+    const wasReposted = post.is_reposted_by_user;
+    const oldCount = post.repost_count || 0;
+    setPosts(prev => prev.map(p =>
+      p._id === postId ? { ...p, is_reposted_by_user: !wasReposted, repost_count: wasReposted ? oldCount - 1 : oldCount + 1 } : p
+    ));
+    try {
+      const res = await fetch(`${API}/reposts/${postId}`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPosts(prev => prev.map(p =>
+          p._id === postId ? { ...p, is_reposted_by_user: data.reposted, repost_count: data.repost_count } : p
+        ));
+      } else {
+        setPosts(prev => prev.map(p =>
+          p._id === postId ? { ...p, is_reposted_by_user: wasReposted, repost_count: oldCount } : p
+        ));
+      }
+    } catch {
+      setPosts(prev => prev.map(p =>
+        p._id === postId ? { ...p, is_reposted_by_user: wasReposted, repost_count: oldCount } : p
+      ));
+    }
+  };
+
+  const handleSharePost = (postId) => {
+    const url = `${window.location.origin}/post/${postId}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => toast("Link copied to clipboard"));
+    } else {
+      toast("Could not copy link", "error");
+    }
+  };
+
+  // Action handlers for repost tab (targets original_post inside repost)
+  const handleRepostLike = async (repostId, originalPostId) => {
+    const repost = reposts.find(r => r._id === repostId);
+    if (!repost?.original_post) return;
+    const wasLiked = repost.original_post.is_liked_by_user;
+    setReposts(prev => prev.map(r =>
+      r._id === repostId ? { ...r, original_post: { ...r.original_post, is_liked_by_user: !wasLiked, likes: wasLiked ? r.original_post.likes - 1 : r.original_post.likes + 1 } } : r
+    ));
+    try {
+      const res = await fetch(`${API}/likes/${originalPostId}`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReposts(prev => prev.map(r =>
+          r._id === repostId ? { ...r, original_post: { ...r.original_post, is_liked_by_user: data.liked, likes: data.likes } } : r
+        ));
+      } else {
+        setReposts(prev => prev.map(r =>
+          r._id === repostId ? { ...r, original_post: { ...r.original_post, is_liked_by_user: wasLiked, likes: repost.original_post.likes } } : r
+        ));
+      }
+    } catch {
+      setReposts(prev => prev.map(r =>
+        r._id === repostId ? { ...r, original_post: { ...r.original_post, is_liked_by_user: wasLiked, likes: repost.original_post.likes } } : r
+      ));
+    }
+  };
+
+  const handleRepostBookmark = async (repostId, originalPostId) => {
+    try {
+      const res = await fetch(`${API}/bookmarks/${originalPostId}`, {
+        method: "POST", headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReposts(prev => prev.map(r =>
+          r._id === repostId ? { ...r, original_post: { ...r.original_post, is_bookmarked: data.bookmarked } } : r
+        ));
+      }
+    } catch {
+      toast("Bookmark failed", "error");
+    }
   };
 
   // Handle profile picture selection
@@ -176,10 +311,10 @@ export default function Profile() {
         setIsEditing(false);
       } else {
         const err = await res.json();
-        alert(err.detail || "Failed to update profile");
+        toast(err.detail || "Failed to update profile", "error");
       }
     } catch {
-      alert("Network error");
+      toast("Network error", "error");
     } finally {
       setIsSaving(false);
     }
@@ -297,7 +432,12 @@ export default function Profile() {
                 <PostLoader />
               </>
             ) : posts.length === 0 ? (
-              <p style={{color: t.textSecondary, textAlign: "center", padding: 20}}>No posts yet</p>
+              <div style={{display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "50px 20px", color: t.textSecondary}}>
+                <svg viewBox="0 0 24 24" width="40" height="40" fill={t.textSecondary} style={{marginBottom: 10, opacity: 0.4}}>
+                  <path d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z"/>
+                </svg>
+                <span style={{fontSize: 15, fontWeight: 600}}>No posts yet</span>
+              </div>
             ) : (
               posts.map((p) => (
               <div key={p._id} style={styles.postCard} onClick={() => navigate(`/post/${p._id}`)}>
@@ -311,7 +451,7 @@ export default function Profile() {
                   </div>
                   <strong style={styles.username}>@{p.username}</strong>
                 </div>
-                <p style={styles.postContent}>{p.content}</p>
+                <p style={styles.postContent}>{parseContent(p.content, { navigate, accentColor: t.accentBlue })}</p>
                 {p.media_url && (
                   <div style={styles.mediaContainer}>
                     {p.media_type === "video" ? (
@@ -331,6 +471,39 @@ export default function Profile() {
                       <span key={idx} style={styles.tag}>{e.text}</span>
                     ))}
                 </div>
+                <div style={styles.postActions} onClick={(e) => e.stopPropagation()}>
+                  <LikeButton
+                    isLiked={p.is_liked_by_user}
+                    count={p.likes || 0}
+                    onLike={() => handleLike(p._id)}
+                  />
+                  <CommentButton
+                    onClick={() => navigate(`/post/${p._id}`)}
+                    count={p.comment_count || 0}
+                  />
+                  <RepostButton
+                    isReposted={p.is_reposted_by_user}
+                    count={p.repost_count || 0}
+                    onRepost={() => handleRepost(p._id)}
+                    onQuoteRepost={() => navigate(`/compose?quote=${p._id}`)}
+                  />
+                  <BookmarkButton
+                    isBookmarked={p.is_bookmarked}
+                    onToggle={() => handleBookmark(p._id)}
+                  />
+                  <button
+                    onClick={() => handleSharePost(p._id)}
+                    style={styles.shareBtn}
+                    aria-label="Share post"
+                    title="Copy link"
+                    onMouseEnter={(e) => e.currentTarget.style.color = t.accentBlue}
+                    onMouseLeave={(e) => e.currentTarget.style.color = t.textSecondary}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
             ))
             )}
@@ -343,7 +516,12 @@ export default function Profile() {
                 <PostLoader />
               </>
             ) : reposts.length === 0 ? (
-              <p style={{color: t.textSecondary, textAlign: "center", padding: 20}}>No reposts yet</p>
+              <div style={{display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "50px 20px", color: t.textSecondary}}>
+                <svg viewBox="0 0 24 24" width="40" height="40" fill={t.textSecondary} style={{marginBottom: 10, opacity: 0.4}}>
+                  <path d="M4.5 3.88l4.432 4.14-1.364 1.46L5.5 7.55V16c0 1.1.896 2 2 2H13v2H7.5c-2.209 0-4-1.79-4-4V7.55L1.432 9.48.068 8.02 4.5 3.88zM16.5 6H11V4h5.5c2.209 0 4 1.79 4 4v8.45l2.068-1.93 1.364 1.46-4.432 4.14-4.432-4.14 1.364-1.46 2.068 1.93V8c0-1.1-.896-2-2-2z"/>
+                </svg>
+                <span style={{fontSize: 15, fontWeight: 600}}>No reposts yet</span>
+              </div>
             ) : (
               reposts.map((r) => (
               <div key={r._id} style={styles.postCard} onClick={() => navigate(`/post/${r.original_post_id}`)}>
@@ -355,13 +533,54 @@ export default function Profile() {
                   <p style={styles.postContent}>{r.quote_content}</p>
                 )}
                 {r.original_post && (
-                  <div style={{...styles.postCard, border: `1px solid ${t.border}`, marginTop: 4, borderRadius: 12}}>
+                  <div style={{...styles.postCard, border: `1px solid ${t.border}`, marginTop: 4, borderRadius: 12, cursor: "default"}} onClick={(e) => e.stopPropagation()}>
                     <div style={styles.postHeader}>
                       <strong style={styles.username}>@{r.original_post.username}</strong>
                     </div>
-                    <p style={{...styles.postContent, fontSize: 14}}>{r.original_post.content}</p>
+                    <p style={{...styles.postContent, fontSize: 14}}>{parseContent(r.original_post.content, { navigate, accentColor: t.accentBlue })}</p>
+                    {r.original_post.media_url && (
+                      <div style={styles.mediaContainer}>
+                        {r.original_post.media_type === "video" ? (
+                          <video src={r.original_post.media_url} controls style={styles.mediaVideo} />
+                        ) : (
+                          <img src={r.original_post.media_url} alt="Post media" style={styles.mediaImage} />
+                        )}
+                      </div>
+                    )}
+                    {r.original_post.gif_url && !r.original_post.media_url && (
+                      <div style={styles.mediaContainer}>
+                        <img src={r.original_post.gif_url} alt="GIF" style={styles.mediaImage} />
+                      </div>
+                    )}
                   </div>
                 )}
+                <div style={styles.postActions} onClick={(e) => e.stopPropagation()}>
+                  <LikeButton
+                    isLiked={r.original_post?.is_liked_by_user}
+                    count={r.original_post?.likes || 0}
+                    onLike={() => handleRepostLike(r._id, r.original_post_id)}
+                  />
+                  <CommentButton
+                    onClick={() => navigate(`/post/${r.original_post_id}`)}
+                    count={r.original_post?.comment_count || 0}
+                  />
+                  <BookmarkButton
+                    isBookmarked={r.original_post?.is_bookmarked}
+                    onToggle={() => handleRepostBookmark(r._id, r.original_post_id)}
+                  />
+                  <button
+                    onClick={() => handleSharePost(r.original_post_id)}
+                    style={styles.shareBtn}
+                    aria-label="Share post"
+                    title="Copy link"
+                    onMouseEnter={(e) => e.currentTarget.style.color = t.accentBlue}
+                    onMouseLeave={(e) => e.currentTarget.style.color = t.textSecondary}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
+                    </svg>
+                  </button>
+                </div>
               </div>
             ))
             )}
@@ -467,14 +686,16 @@ function getStyles(t, m, bg) {
   tabBar: { display: "flex", borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}`, maxWidth: "600px", margin: "0 auto", width: "100%" },
   tab: { flex: 1, padding: "16px 0", background: "none", border: "none", borderBottom: "2px solid transparent", color: t.textSecondary, fontSize: "15px", fontWeight: "600", cursor: "pointer", textAlign: "center", transition: "all 0.2s" },
   tabActive: { flex: 1, padding: "16px 0", background: "none", border: "none", borderBottom: `2px solid ${t.accentBlue}`, color: t.text, fontSize: "15px", fontWeight: "700", cursor: "pointer", textAlign: "center", transition: "all 0.2s" },
-  postCard: { backgroundColor: glass ? "rgba(255,255,255,0.1)" : t.cardBg, borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}`, padding: m ? "12px 16px" : "16px 20px", transition: "background-color 0.15s" },
+  postCard: { backgroundColor: glass ? "rgba(255,255,255,0.1)" : t.cardBg, borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}`, padding: m ? "12px 16px" : "16px 20px", transition: "background-color 0.15s", cursor: "pointer" },
   postHeader: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" },
   avatarSmall: { width: "32px", height: "32px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "700", color: "#1a1a1a", flexShrink: 0, overflow: "hidden" },
   username: { fontSize: "15px", fontWeight: "700", color: t.text },
   postContent: { fontSize: "15px", lineHeight: "1.5", margin: "4px 0", color: t.text, wordBreak: "break-word" },
   entityContainer: { display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" },
   tag: { backgroundColor: t.tagBg, color: t.tagText, padding: "3px 10px", borderRadius: "9999px", fontSize: m ? "12px" : "13px", fontWeight: "500" },
-
+  // Action buttons
+  postActions: { display: "flex", alignItems: "center", gap: m ? "16px" : "24px", marginTop: "8px", paddingTop: "4px" },
+  shareBtn: { background: "none", border: "none", cursor: "pointer", color: t.textSecondary, display: "flex", alignItems: "center", justifyContent: "center", padding: "6px", borderRadius: "50%", transition: "color 0.2s" },
   // Media styles
   mediaContainer: { marginTop: "12px", borderRadius: "16px", overflow: "hidden", maxHeight: "500px" },
   mediaImage: { width: "100%", height: "auto", maxHeight: "500px", objectFit: "cover", display: "block" },

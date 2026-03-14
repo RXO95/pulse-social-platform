@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
+import { ToastProvider } from "./context/ToastContext";
+import { ConfirmProvider } from "./context/ConfirmContext";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Feed from "./pages/Feed";
@@ -20,6 +22,8 @@ import SidebarLayout from "./components/SidebarLayout";
 export default function App() {
   return (
     <ThemeProvider>
+    <ToastProvider>
+    <ConfirmProvider>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
@@ -46,6 +50,8 @@ export default function App() {
         </Routes>
       </BrowserRouter>
     </AuthProvider>
+    </ConfirmProvider>
+    </ToastProvider>
     </ThemeProvider>
   );
 }

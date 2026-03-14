@@ -204,6 +204,9 @@ export default function ExploreScreen({ navigation }) {
                   <Text style={{ color: t.textSecondary, marginTop: 12, fontSize: 15 }}>
                     No trending topics right now
                   </Text>
+                  <Text style={{ color: t.textSecondary, marginTop: 6, fontSize: 13, textAlign: "center", paddingHorizontal: 32 }}>
+                    Be the first to post about something!
+                  </Text>
                 </View>
               }
               renderItem={({ item, index }) => {

@@ -3,9 +3,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../context/ConfirmContext";
 import GifPicker from "../components/GifPicker";
 
 import useIsMobile from "../hooks/useIsMobile";
+import { timeAgo } from "../utils/timeAgo";
 import {
   getPublicKeyJwk,
   encryptMessage,
@@ -24,29 +27,13 @@ if (recvSound) recvSound.volume = 0.5;
 function playSend() { try { if (sendSound) { sendSound.currentTime = 0; sendSound.play(); } } catch {} }
 function playRecv() { try { if (recvSound) { recvSound.currentTime = 0; recvSound.play(); } } catch {} }
 
-function timeAgo(dateString) {
-  if (!dateString) return "";
-  const now = new Date();
-  let raw = String(dateString);
-  if (!raw.endsWith("Z") && !raw.includes("+")) raw += "Z";
-  const date = new Date(raw);
-  const seconds = Math.floor((now - date) / 1000);
-  if (seconds < 0) return "now";
-  if (seconds < 60) return "now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
 /* ══════════════════════════════════════════════════════════════════
    Messages page — conversation list + inline chat
    ══════════════════════════════════════════════════════════════════ */
 
 export default function Messages() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [conversations, setConversations] = useState([]);
   const [activeConv, setActiveConv] = useState(null);      // conversation doc
   const [messages, setMessages] = useState([]);
@@ -315,7 +302,7 @@ export default function Messages() {
     const otherUserId = activeConv.other_user.user_id;
 
     if (!recipientKey) {
-      alert("Recipient hasn't registered their encryption key yet. They need to open Messages at least once.");
+      toast("Recipient hasn't registered their encryption key yet", "warning");
       return;
     }
 
@@ -516,7 +503,8 @@ export default function Messages() {
   };
 
   const handleDeleteMessage = async (messageId) => {
-    if (!window.confirm("Delete this message?")) return;
+    const ok = await confirm("Delete this message?", { title: "Delete Message", confirmText: "Delete" });
+    if (!ok) return;
     try {
       const res = await fetch(`${API}/messages/${messageId}`, {
         method: "DELETE",
@@ -606,7 +594,7 @@ export default function Messages() {
           )}
           <div style={s.composeBar}>
             <button style={s.emojiToggle} onClick={() => setShowEmoji((v) => !v)}>
-              <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? "#1d9bf0" : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? t.accentBlue : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
             </button>
             <button style={{...s.emojiToggle, marginLeft: 0}} onClick={() => setShowGifPicker(true)}>
               <span style={{fontWeight: 800, fontSize: 13, color: t.textSecondary}}>GIF</span>
@@ -718,7 +706,7 @@ export default function Messages() {
             )}
             <div style={s.composeBar}>
               <button style={s.emojiToggle} onClick={() => setShowEmoji((v) => !v)}>
-                <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? "#1d9bf0" : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+                <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? t.accentBlue : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
               </button>
               <button style={{...s.emojiToggle, marginLeft: 0}} onClick={() => setShowGifPicker(true)}>
                 <span style={{fontWeight: 800, fontSize: 13, color: t.textSecondary}}>GIF</span>
@@ -761,7 +749,7 @@ export default function Messages() {
                   <div style={{ fontSize: 13, color: t.textSecondary, marginBottom: 2 }}>Status</div>
                   <div style={{ fontSize: 15, color: t.text, display: "flex", alignItems: "center", gap: 6 }}>
                     {infoModal.read ? (
-                      <><svg viewBox="0 0 24 24" width="16" height="16" fill="#1d9bf0"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z"/></svg> Read</>
+                      <><svg viewBox="0 0 24 24" width="16" height="16" fill={t.accentBlue}><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z"/></svg> Read</>
                     ) : (
                       <><svg viewBox="0 0 24 24" width="16" height="16" fill={t.textSecondary}><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Delivered</>
                     )}
@@ -1013,7 +1001,7 @@ function MessageBubble({ msg, isMine, getDecryptedText, theme: t, onReply, onRea
         <div style={{
           padding: "8px 14px",
           borderRadius: isMine ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-          backgroundColor: isMine ? "#1d9bf0" : (t.cardBg === "#ffffff" ? "#eff3f4" : "#2f3336"),
+          backgroundColor: isMine ? (t.accentBlue || "#1d9bf0") : (t.cardBg === "#ffffff" ? "#eff3f4" : "#2f3336"),
           color: isMine ? "#fff" : t.text,
           fontSize: 15,
           lineHeight: "1.4",
@@ -1310,7 +1298,7 @@ function getStyles(t, mobile, bg) {
     },
     unreadBadge: {
       marginLeft: "auto",
-      backgroundColor: "#1d9bf0", color: "#fff",
+      backgroundColor: t.accentBlue || "#1d9bf0", color: "#fff",
       fontSize: 11, fontWeight: 700,
       padding: "1px 7px", borderRadius: 9999,
       minWidth: 18, textAlign: "center",
@@ -1402,7 +1390,7 @@ function getStyles(t, mobile, bg) {
     },
     sendBtn: {
       width: 40, height: 40, borderRadius: "50%",
-      backgroundColor: "#1d9bf0", border: "none",
+      backgroundColor: t.accentBlue || "#1d9bf0", border: "none",
       display: "flex", justifyContent: "center", alignItems: "center",
       cursor: "pointer", flexShrink: 0,
     },
@@ -1448,14 +1436,14 @@ function getStyles(t, mobile, bg) {
     },
     replyBarContent: {
       flex: 1,
-      borderLeft: `3px solid #1d9bf0`,
+      borderLeft: `3px solid ${t.accentBlue || "#1d9bf0"}`,
       paddingLeft: 10,
       overflow: "hidden",
     },
     replyBarLabel: {
       fontSize: 12,
       fontWeight: 600,
-      color: "#1d9bf0",
+      color: t.accentBlue || "#1d9bf0",
     },
     replyBarText: {
       fontSize: 13,

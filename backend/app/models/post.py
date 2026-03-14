@@ -9,6 +9,15 @@ class PostCreate(BaseModel):
     # media_url and media_type will be set from file upload
 
 
+class PostEdit(BaseModel):
+    content: str
+
+
+class DraftCreate(BaseModel):
+    content: str = ""
+    gif_url: Optional[str] = None
+
+
 class PostInDB(BaseModel):
     user_id: str
     username: str

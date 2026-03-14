@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
+import { useConfirm } from "../context/ConfirmContext";
+import { parseContent } from "../utils/parseContent";
 import LikeButton from "../components/LikeButton";
 import CommentButton from "../components/CommentButton";
 import BookmarkButton from "../components/BookmarkButton";
@@ -14,24 +17,7 @@ import PulseLogo from "../components/PulseLogo";
 import useIsMobile from "../hooks/useIsMobile";
 import WeatherWidget from "../components/WeatherWidget";
 import NewsWidget from "../components/NewsWidget";
-
-function timeAgo(dateString) {
-  if (!dateString) return "";
-  const now = new Date();
-  let raw = String(dateString);
-  if (!raw.endsWith("Z") && !raw.includes("+")) raw += "Z";
-  const date = new Date(raw);
-  const seconds = Math.floor((now - date) / 1000);
-  if (seconds < 0) return "now";
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
+import { timeAgo } from "../utils/timeAgo";
 
 /* ─── Swipeable Widget Carousel ─── */
 function WidgetCarousel({ theme: t }) {
@@ -89,7 +75,7 @@ function WidgetCarousel({ theme: t }) {
               fontSize: 13,
               fontWeight: active === i ? 700 : 500,
               cursor: "pointer",
-              background: active === i ? "#1d9bf0" : (t.inputBg || "rgba(255,255,255,0.08)"),
+              background: active === i ? (t.accentBlue || "#1d9bf0") : (t.inputBg || "rgba(255,255,255,0.08)"),
               color: active === i ? "#fff" : (t.textSecondary || "#888"),
               transition: "all 0.25s",
               whiteSpace: "nowrap",
@@ -148,6 +134,8 @@ function WidgetCarousel({ theme: t }) {
 }
 
 export default function Feed() {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [posts, setPosts] = useState([]);
   const [trending, setTrending] = useState([]);
   const [content, setContent] = useState("");
@@ -156,6 +144,15 @@ export default function Feed() {
   const [isLoading, setIsLoading] = useState(true);
   const [openMenuId, setOpenMenuId] = useState(null);
   const [isPosting, setIsPosting] = useState(false);
+
+  // Edit post state
+  const [editPostId, setEditPostId] = useState(null);
+  const [editContent, setEditContent] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Drafts state
+  const [drafts, setDrafts] = useState([]);
+  const [showDrafts, setShowDrafts] = useState(false);
   
   // Media upload state
   const [mediaFile, setMediaFile] = useState(null);
@@ -164,6 +161,14 @@ export default function Feed() {
   const [gifUrl, setGifUrl] = useState(null);
   const [showGifPicker, setShowGifPicker] = useState(false);
   const mediaInputRef = useRef(null);
+
+  // Double-tap to like
+  const lastTapRef = useRef({});
+  const [doubleTapHeart, setDoubleTapHeart] = useState(null);
+
+  // New posts banner
+  const [hasNewPosts, setHasNewPosts] = useState(false);
+  const latestPostIdRef = useRef(null);
 
   const { logout } = useAuth();
   const navigate = useNavigate(); 
@@ -205,7 +210,7 @@ export default function Feed() {
       }));
       setPosts(processedPosts);
     } catch {
-      alert("Failed to load feed");
+      toast("Failed to load feed", "error");
     } finally {
       setIsLoading(false);
     }
@@ -223,6 +228,52 @@ export default function Feed() {
     }
   };
 
+  // --- DRAFTS ---
+  const fetchDrafts = async () => {
+    try {
+      const res = await fetch(`${API}/drafts/`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) setDrafts(await res.json());
+    } catch {}
+  };
+
+  const saveDraft = async () => {
+    if (!content.trim() && !gifUrl) return;
+    try {
+      await fetch(`${API}/drafts/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ content: content.trim(), gif_url: gifUrl || null })
+      });
+      setContent("");
+      clearMedia();
+      setGifUrl(null);
+      fetchDrafts();
+    } catch { toast("Could not save draft", "error"); }
+  };
+
+  const loadDraft = (draft) => {
+    setContent(draft.content || "");
+    setGifUrl(draft.gif_url || null);
+    setShowDrafts(false);
+    // Delete the draft once loaded
+    fetch(`${API}/drafts/${draft._id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(() => fetchDrafts()).catch(() => {});
+  };
+
+  const deleteDraft = async (draftId) => {
+    try {
+      await fetch(`${API}/drafts/${draftId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchDrafts();
+    } catch {}
+  };
+
   const handleSearch = async (query) => {
     setSearchQuery(query);
     if (!query.trim()) {
@@ -236,7 +287,7 @@ export default function Feed() {
       
       if (!res.ok) {
         console.error("Search failed with status:", res.status);
-        alert("Search failed. Please try again.");
+        toast("Search failed. Please try again.", "error");
         return;
       }
       
@@ -245,7 +296,7 @@ export default function Feed() {
       setPosts(data.results || []);
     } catch (error) {
       console.error("Search error:", error);
-      alert("Search failed. Please check the console for details.");
+      toast("Search failed", "error");
     }
   };
 
@@ -319,7 +370,7 @@ export default function Feed() {
             : p
         ));
         const data = await res.json();
-        alert(data.message || "Action failed");
+        toast(data.message || "Action failed", "error");
       }
     } catch {
       // Revert on error
@@ -328,7 +379,7 @@ export default function Feed() {
           ? { ...p, is_followed_by_user: isFollowing } 
           : p
       ));
-      alert("Network error while updating follow status");
+      toast("Network error", "error");
     }
   };
 
@@ -366,15 +417,14 @@ export default function Feed() {
         setPosts(updatedPosts);
       }
     } catch {
-      alert("Translation failed");
+      toast("Translation failed", "error");
     }
   };
 
   // --- NEW: HANDLE DELETE POST ---
   const handleDeletePost = async (postId) => {
-    if (!window.confirm("Are you sure you want to delete this post?")) {
-      return;
-    }
+    const ok = await confirm("Are you sure you want to delete this post?", { title: "Delete Post", confirmText: "Delete" });
+    if (!ok) return;
 
     try {
       const res = await fetch(`${API}/posts/${postId}`, {
@@ -388,10 +438,51 @@ export default function Feed() {
         setOpenMenuId(null);
       } else {
         const data = await res.json();
-        alert(data.detail || "Failed to delete post");
+        toast(data.detail || "Failed to delete post", "error");
       }
     } catch {
-      alert("Could not delete post");
+      toast("Could not delete post", "error");
+    }
+  };
+
+  // --- HANDLE EDIT POST ---
+  const openEditModal = (post) => {
+    setEditPostId(post._id);
+    setEditContent(post.content);
+    setOpenMenuId(null);
+  };
+
+  const handleEditPost = async () => {
+    if (!editContent.trim() || !editPostId) return;
+    setIsEditing(true);
+    try {
+      const res = await fetch(`${API}/posts/${editPostId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content: editContent.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPosts((prev) =>
+          prev.map((p) =>
+            p._id === editPostId
+              ? { ...p, content: data.content, is_edited: true }
+              : p
+          )
+        );
+        setEditPostId(null);
+        setEditContent("");
+      } else {
+        const data = await res.json();
+        toast(data.detail || "Failed to edit post", "error");
+      }
+    } catch {
+      toast("Could not edit post", "error");
+    } finally {
+      setIsEditing(false);
     }
   };
 
@@ -411,7 +502,7 @@ export default function Feed() {
         ));
       }
     } catch {
-      console.error("Bookmark failed");
+      toast("Bookmark failed", "error");
     }
   };
 
@@ -455,8 +546,69 @@ export default function Feed() {
   useEffect(() => {
     fetchPosts();
     fetchTrending();
-    fetchCurrentUser(); 
+    fetchCurrentUser();
+    fetchDrafts();
   }, []);
+
+  // Track latest post ID for new-posts banner
+  useEffect(() => {
+    if (posts.length > 0) {
+      latestPostIdRef.current = posts[0]._id;
+    }
+  }, [posts]);
+
+  // Poll for new posts every 30s
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (!latestPostIdRef.current || searchQuery) return;
+      try {
+        const res = await fetch(`${API}/feed/latest-id`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.latest_id && data.latest_id !== latestPostIdRef.current) {
+            setHasNewPosts(true);
+          }
+        }
+      } catch {}
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [searchQuery]);
+
+  // Double-tap handler for post cards
+  const handleDoubleTap = (postId) => {
+    const now = Date.now();
+    const lastTap = lastTapRef.current[postId] || 0;
+    if (now - lastTap < 300) {
+      clearTimeout(lastTapRef.current[`${postId}_t`]);
+      const post = posts.find((p) => p._id === postId);
+      if (post && !post.is_liked_by_user) {
+        handleLike(postId);
+      }
+      setDoubleTapHeart(postId);
+      setTimeout(() => setDoubleTapHeart(null), 900);
+      lastTapRef.current[postId] = 0;
+    } else {
+      lastTapRef.current[postId] = now;
+      lastTapRef.current[`${postId}_t`] = setTimeout(() => {
+        if (lastTapRef.current[postId] === now) {
+          navigate(`/post/${postId}`);
+          lastTapRef.current[postId] = 0;
+        }
+      }, 280);
+    }
+  };
+
+  // Share / copy link handler
+  const handleSharePost = (postId) => {
+    const url = `${window.location.origin}/post/${postId}`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(() => toast("Link copied to clipboard"));
+    } else {
+      toast("Could not copy link", "error");
+    }
+  };
 
 
   // Close menu when clicking outside
@@ -528,7 +680,7 @@ export default function Feed() {
       
       if (!res.ok) {
         const data = await res.json();
-        alert(data.detail?.message || data.detail || "Post blocked");
+        toast(data.detail?.message || data.detail || "Post blocked", "error");
         return;
       }
       setContent("");
@@ -543,7 +695,7 @@ export default function Feed() {
         await new Promise(r => setTimeout(r, 1000 - elapsed));
       }
     } catch {
-      alert("Could not create post");
+      toast("Could not create post", "error");
     } finally {
       setIsPosting(false);
     }
@@ -551,6 +703,18 @@ export default function Feed() {
 
   return (
     <div style={styles.pageRoot}>
+      {/* Heart animation keyframes */}
+      <style>{`
+        @keyframes heartPop {
+          0% { transform: scale(0); opacity: 0; }
+          15% { transform: scale(1.3); opacity: 1; }
+          30% { transform: scale(0.95); opacity: 1; }
+          45% { transform: scale(1.05); opacity: 1; }
+          60% { transform: scale(1); opacity: 1; }
+          80% { transform: scale(1); opacity: 0.6; }
+          100% { transform: scale(1); opacity: 0; }
+        }
+      `}</style>
       {/* Mobile-only header */}
       {mobile && (
         <header style={styles.header}>
@@ -636,7 +800,13 @@ export default function Feed() {
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
                   style={styles.textarea}
+                  maxLength={1000}
                 />
+                {content.length > 0 && (
+                  <div style={{ textAlign: "right", fontSize: "12px", color: content.length > 900 ? (content.length > 980 ? "#f4212e" : "#ff9800") : t.textSecondary, marginTop: "-4px", marginBottom: "4px", opacity: 0.8 }}>
+                    {content.length}/1000
+                  </div>
+                )}
                 
                 {/* Media Preview */}
                 {mediaPreview && (
@@ -692,6 +862,31 @@ export default function Feed() {
                   >
                     {isPosting ? "Posting..." : "Post"}
                   </button>
+                  {(content.trim() || gifUrl) && (
+                    <button onClick={saveDraft} style={styles.saveDraftBtn} title="Save as draft">
+                      Draft
+                    </button>
+                  )}
+                  {drafts.length > 0 && (
+                    <div style={{ position: "relative" }}>
+                      <button onClick={() => setShowDrafts(!showDrafts)} style={styles.draftsIndicator} title="Load a draft">
+                        Drafts ({drafts.length})
+                      </button>
+                      {showDrafts && (
+                        <div style={styles.draftsDropdown}>
+                          <div style={styles.draftsHeader}>Drafts</div>
+                          {drafts.map((d) => (
+                            <div key={d._id} style={styles.draftItem}>
+                              <div style={styles.draftContent} onClick={() => loadDraft(d)}>
+                                {d.content?.length > 60 ? d.content.slice(0, 60) + "..." : d.content || "(GIF only)"}
+                              </div>
+                              <button onClick={(e) => { e.stopPropagation(); deleteDraft(d._id); }} style={styles.draftDeleteBtn}>✕</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -699,16 +894,44 @@ export default function Feed() {
 
           <div style={styles.feedList}>
             {isPosting && <PostLoader />}
-            {isLoading ? (
+            {/* New posts available banner */}
+          {hasNewPosts && (
+            <div
+              style={styles.newPostsBanner}
+              onClick={() => {
+                setHasNewPosts(false);
+                fetchPosts(false);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+              </svg>
+              New posts available
+            </div>
+          )}
+
+          {isLoading ? (
               <>
                 <PostLoader />
                 <PostLoader />
                 <PostLoader />
                 <PostLoader />
               </>
+            ) : posts.length === 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 20px", color: t.textSecondary }}>
+                <svg viewBox="0 0 24 24" width="48" height="48" fill={t.textSecondary} style={{ marginBottom: 12, opacity: 0.5 }}>
+                  <path d="M1.751 10c0-4.42 3.584-8 8.005-8h4.366c4.49 0 8.129 3.64 8.129 8.13 0 2.96-1.607 5.68-4.196 7.11l-8.054 4.46v-3.69h-.067c-4.49.1-8.183-3.51-8.183-8.01zm8.005-6c-3.317 0-6.005 2.69-6.005 6 0 3.37 2.77 6.08 6.138 6.01l.351-.01h1.761v2.3l5.087-2.81c1.951-1.08 3.163-3.13 3.163-5.36 0-3.39-2.744-6.13-6.129-6.13H9.756z"/>
+                </svg>
+                <span style={{ fontSize: 16, fontWeight: 600 }}>No posts yet</span>
+                <span style={{ fontSize: 14, marginTop: 4, opacity: 0.7 }}>Be the first to share something</span>
+              </div>
             ) : (
               posts.map((p) => (
-              <div key={p._id} style={styles.postCard}>
+              <div key={p._id} style={styles.postCard}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = glass ? "rgba(255,255,255,0.14)" : (darkMode ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.015)")}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = glass ? "rgba(255,255,255,0.1)" : t.cardBg}
+              >
                 <div style={styles.postHeader}>
                   <div style={styles.avatar}>
                     {p.profile_pic_url ? (
@@ -748,6 +971,7 @@ export default function Feed() {
                     <div style={styles.menuContainer} data-menu>
                       <button 
                         style={styles.menuButton}
+                        aria-label="Post options"
                         onClick={(e) => {
                           e.stopPropagation();
                           setOpenMenuId(openMenuId === p._id ? null : p._id);
@@ -759,6 +983,19 @@ export default function Feed() {
                       </button>
                       {openMenuId === p._id && (
                         <div style={styles.dropdown}>
+                          {p.username === currentUser.username && (
+                            <button 
+                              style={styles.editBtn}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditModal(p);
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = t.hoverBg}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
+                            >
+                              Edit Post
+                            </button>
+                          )}
                           <button 
                             style={styles.deleteBtn}
                             onClick={(e) => {
@@ -776,14 +1013,15 @@ export default function Feed() {
                   )}
                 </div>
 
-                {/* --- CLICKABLE POST AREA --- */}
+                {/* --- CLICKABLE POST AREA (double-tap to like) --- */}
                 <div 
-                  style={{cursor: "pointer"}} 
-                  onClick={() => navigate(`/post/${p._id}`)}
+                  style={{cursor: "pointer", position: "relative", userSelect: "none"}} 
+                  onClick={() => handleDoubleTap(p._id)}
                 >
                     {/* Toggle between Original and Translated Text */}
                     <p style={styles.postContent}>
-                      {p.showTranslation ? p.translatedText : p.content}
+                      {parseContent(p.showTranslation ? p.translatedText : p.content, { navigate, accentColor: t.accentBlue })}
+                      {p.is_edited && <span style={{color: t.textSecondary, fontSize: "12px", marginLeft: "6px", fontStyle: "italic"}}>(edited)</span>}
                     </p>
 
                     {/* --- POST MEDIA --- */}
@@ -801,6 +1039,15 @@ export default function Feed() {
                     {p.gif_url && !p.media_url && (
                       <div style={styles.postMediaContainer} onClick={e => e.stopPropagation()}>
                         <img src={p.gif_url} alt="GIF" style={styles.postMedia} />
+                      </div>
+                    )}
+
+                    {/* Heart overlay on double-tap */}
+                    {doubleTapHeart === p._id && (
+                      <div style={styles.heartOverlay}>
+                        <svg viewBox="0 0 24 24" width="80" height="80" style={styles.heartSvg}>
+                          <path fill="#f91880" d="M20.884 13.19c-1.351 2.48-4.001 5.12-8.379 7.67l-.503.3-.504-.3c-4.379-2.55-7.029-5.19-8.382-7.67-1.36-2.5-1.45-4.92-.334-6.98C3.907 4.19 6.043 3 8.399 3c1.837 0 3.238.84 4.1 1.78A5.61 5.61 0 0 1 16.6 3c2.358 0 4.494 1.19 5.617 3.21 1.116 2.06 1.026 4.48-.333 6.98z"/>
+                        </svg>
                       </div>
                     )}
 
@@ -874,6 +1121,18 @@ export default function Feed() {
                     isBookmarked={p.is_bookmarked}
                     onToggle={() => handleBookmark(p._id)}
                   />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleSharePost(p._id); }}
+                    style={styles.shareBtn}
+                    aria-label="Share post"
+                    title="Copy link"
+                    onMouseEnter={(e) => e.currentTarget.style.color = t.accentBlue}
+                    onMouseLeave={(e) => e.currentTarget.style.color = t.textSecondary}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
+                    </svg>
+                  </button>
                 </div>
               </div>
             ))
@@ -932,6 +1191,44 @@ export default function Feed() {
           onClose={() => setShowGifPicker(false)}
           theme={t}
         />
+      )}
+
+      {/* Edit Post Modal */}
+      {editPostId && (
+        <div style={styles.editOverlay} onClick={() => setEditPostId(null)}>
+          <div style={styles.editModal} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.editHeader}>
+              <h3 style={{margin: 0, color: t.text, fontSize: "18px"}}>Edit Post</h3>
+              <button
+                style={{background: "none", border: "none", cursor: "pointer", fontSize: "20px", color: t.textSecondary}}
+                onClick={() => setEditPostId(null)}
+              >✕</button>
+            </div>
+            <textarea
+              style={styles.editTextarea}
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              maxLength={1000}
+              autoFocus
+            />
+            {editContent.length > 0 && (
+              <div style={{ textAlign: "right", fontSize: "12px", color: editContent.length > 900 ? (editContent.length > 980 ? "#f4212e" : "#ff9800") : t.textSecondary, marginTop: "4px", opacity: 0.8 }}>
+                {editContent.length}/1000
+              </div>
+            )}
+            <div style={{display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "12px"}}>
+              <button
+                style={styles.editCancelBtn}
+                onClick={() => setEditPostId(null)}
+              >Cancel</button>
+              <button
+                style={{...styles.editSaveBtn, opacity: editContent.trim() ? 1 : 0.5}}
+                onClick={handleEditPost}
+                disabled={!editContent.trim() || isEditing}
+              >{isEditing ? "Saving..." : "Save"}</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -1101,6 +1398,13 @@ function getStyles(t, m, bg) {
   postMedia: { width: "100%", maxHeight: m ? "300px" : "500px", objectFit: "cover", display: "block" },
   
   postButton: { backgroundColor: t.accentBlue, color: "#fff", border: "none", padding: m ? "8px 20px" : "10px 24px", borderRadius: "9999px", fontWeight: "700", fontSize: "15px", cursor: "pointer", transition: "all 0.2s" },
+  saveDraftBtn: { backgroundColor: "transparent", color: t.textSecondary, border: `1px solid ${t.border}`, padding: m ? "8px 14px" : "10px 18px", borderRadius: "9999px", fontWeight: "600", fontSize: "13px", cursor: "pointer", transition: "all 0.2s" },
+  draftsIndicator: { background: "none", border: "none", color: t.accentBlue, cursor: "pointer", fontSize: "13px", fontWeight: "600", padding: "6px 8px", borderRadius: 8 },
+  draftsDropdown: { position: "absolute", top: "100%", right: 0, minWidth: 260, maxHeight: 300, overflowY: "auto", backgroundColor: glass ? "rgba(30,30,30,0.92)" : t.cardBg, border: `1px solid ${glass ? "rgba(255,255,255,0.2)" : t.border}`, borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 100, backdropFilter: glass ? "blur(40px)" : undefined },
+  draftsHeader: { padding: "10px 14px", fontWeight: "700", fontSize: 14, color: t.text, borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}` },
+  draftItem: { display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.08)" : t.border}`, cursor: "pointer", transition: "background 0.15s" },
+  draftContent: { flex: 1, fontSize: 13, color: t.textSecondary, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  draftDeleteBtn: { background: "none", border: "none", color: t.riskText || "#e0245e", cursor: "pointer", fontSize: 14, padding: 4, flexShrink: 0 },
   feedList: { display: "flex", flexDirection: "column", gap: "0", paddingBottom: "100px" },
   postCard: { backgroundColor: glass ? "rgba(255,255,255,0.1)" : t.cardBg, padding: m ? "12px 12px 4px" : "16px 16px 4px", borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}`, transition: "background-color 0.15s" },
   postHeader: { display: "flex", alignItems: "flex-start", marginBottom: "4px" },
@@ -1132,6 +1436,53 @@ function getStyles(t, m, bg) {
     gap: m ? "16px" : "24px",
     marginTop: "8px",
     paddingTop: "4px"
+  },
+  heartOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    pointerEvents: "none",
+    zIndex: 5,
+  },
+  heartSvg: {
+    animation: "heartPop 0.9s ease-out forwards",
+    filter: "drop-shadow(0 2px 8px rgba(249, 24, 128, 0.5))",
+  },
+  shareBtn: {
+    background: "none",
+    border: "none",
+    cursor: "pointer",
+    color: t.textSecondary,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "6px",
+    borderRadius: "50%",
+    transition: "color 0.2s",
+  },
+  newPostsBanner: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+    padding: "10px 20px",
+    margin: "0 auto",
+    marginTop: "8px",
+    width: "fit-content",
+    borderRadius: "9999px",
+    backgroundColor: t.accentBlue,
+    color: "#fff",
+    fontSize: "13px",
+    fontWeight: "700",
+    cursor: "pointer",
+    boxShadow: "0 2px 12px rgba(29,155,240,0.4)",
+    transition: "transform 0.2s, box-shadow 0.2s",
+    zIndex: 5,
   },
   followBtn: {
     backgroundColor: t.text === "#e7e9ea" ? "#eff3f4" : "#0f1419",
@@ -1198,5 +1549,78 @@ function getStyles(t, m, bg) {
     gap: "8px",
     transition: "background 0.2s",
     borderRadius: "12px"
-  }
+  },
+  editBtn: {
+    width: "100%",
+    border: "none",
+    background: "transparent",
+    padding: "12px 16px",
+    textAlign: "left",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+    color: t.text,
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    transition: "background 0.2s",
+    borderRadius: "12px"
+  },
+  editOverlay: {
+    position: "fixed",
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  editModal: {
+    backgroundColor: t.cardBg,
+    borderRadius: "16px",
+    padding: "24px",
+    width: "90%",
+    maxWidth: "500px",
+    border: `1px solid ${t.border}`,
+  },
+  editHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: "16px",
+  },
+  editTextarea: {
+    width: "100%",
+    minHeight: "120px",
+    borderRadius: "12px",
+    border: `1px solid ${t.border}`,
+    backgroundColor: t.bg,
+    color: t.text,
+    padding: "12px",
+    fontSize: "15px",
+    resize: "vertical",
+    fontFamily: "inherit",
+    outline: "none",
+    boxSizing: "border-box",
+  },
+  editCancelBtn: {
+    padding: "8px 20px",
+    borderRadius: "20px",
+    border: `1px solid ${t.border}`,
+    background: "transparent",
+    color: t.text,
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "600",
+  },
+  editSaveBtn: {
+    padding: "8px 24px",
+    borderRadius: "20px",
+    border: "none",
+    backgroundColor: t.accentBlue,
+    color: "#fff",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "600",
+  },
 }; }

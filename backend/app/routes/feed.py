@@ -20,3 +20,15 @@ async def get_feed(user=Depends(get_current_user)):
         posts.append(post)
 
     return posts
+
+
+@router.get("/latest-id")
+async def get_latest_post_id(user=Depends(get_current_user)):
+    """Lightweight endpoint to check if new posts exist."""
+    post = await db.posts.find_one(
+        sort=[("created_at", -1)],
+        projection={"_id": 1},
+    )
+    if post:
+        return {"latest_id": str(post["_id"])}
+    return {"latest_id": None}

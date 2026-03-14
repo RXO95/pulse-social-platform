@@ -3,7 +3,7 @@ from datetime import datetime
 from bson import ObjectId
 from typing import Optional
 
-from app.models.post import PostCreate
+from app.models.post import PostCreate, PostEdit
 from app.services.database import db
 from app.auth.dependency import get_current_user
 from app.services.ml_client import analyze_text, generate_context
@@ -245,6 +245,54 @@ async def delete_post(post_id: str, user=Depends(get_current_user)):
     await db.likes.delete_many({"post_id": post_id})
 
     return {"message": "Post deleted successfully"}
+
+
+@router.put("/{post_id}")
+async def edit_post(post_id: str, body: PostEdit, user=Depends(get_current_user)):
+    """Edit the text content of an existing post (owner only)."""
+    if not ObjectId.is_valid(post_id):
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+
+    post = await db.posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    if post["user_id"] != user["user_id"]:
+        raise HTTPException(status_code=403, detail="You can only edit your own posts")
+
+    new_content = body.content.strip()
+    if not new_content:
+        raise HTTPException(status_code=400, detail="Content cannot be empty")
+
+    # Re-analyze with ML service
+    try:
+        analysis = await analyze_text(new_content)
+    except Exception:
+        raise HTTPException(status_code=503, detail="ML service unavailable")
+
+    if analysis.get("risk_score", 0) > 0.6:
+        raise HTTPException(status_code=403, detail="Edit blocked due to sensitive or harmful content")
+
+    # Build edit history
+    edit_history = post.get("edit_history", [])
+    edit_history.append({
+        "content": post["content"],
+        "edited_at": datetime.utcnow()
+    })
+
+    await db.posts.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$set": {
+            "content": new_content,
+            "entities": analysis.get("entities", []),
+            "risk_score": analysis.get("risk_score", 0),
+            "is_edited": True,
+            "edited_at": datetime.utcnow(),
+            "edit_history": edit_history,
+        }}
+    )
+
+    return {"message": "Post updated", "content": new_content, "entities": analysis.get("entities", [])}
 
 
 @router.get("/related/{entity_text}")

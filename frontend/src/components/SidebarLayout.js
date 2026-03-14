@@ -208,6 +208,8 @@ export default function SidebarLayout() {
             return (
               <button
                 key={item.path}
+                aria-label={item.label}
+                aria-current={active ? "page" : undefined}
                 onClick={() => {
                   if (item.path === "/profile" && currentUser) {
                     navigate(`/profile/${currentUser.username}`);

@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +14,7 @@ import {
 import * as SecureStore from "expo-secure-store";
 import { LinearGradient } from "expo-linear-gradient";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import api from "../api/client";
 import { deriveBackupKey, ensureKeys } from "../utils/crypto";
 
@@ -25,10 +25,11 @@ export default function LoginScreen({ navigation }) {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
+  const toast = useToast();
 
   const submit = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert("Error", "Please fill in all fields");
+      toast("Please fill in all fields", "error");
       return;
     }
 
@@ -53,7 +54,7 @@ export default function LoginScreen({ navigation }) {
     } catch (err) {
       const msg =
         err.response?.data?.detail || "Invalid credentials. Please try again.";
-      Alert.alert("Login Failed", msg);
+      toast(msg || "Login failed", "error");
     } finally {
       setIsLoading(false);
     }

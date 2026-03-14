@@ -8,9 +8,10 @@ const CommentButton = ({ onClick, count = 0 }) => {
   const { darkMode, background } = useTheme();
   const t = getTheme(darkMode, background);
   const defaultColor = t.textSecondary || '#71767b';
+  const hoverColor = t.accentBlue || '#1d9bf0';
 
   return (
-    <StyledWrapper $defaultColor={defaultColor}>
+    <StyledWrapper $defaultColor={defaultColor} $hoverColor={hoverColor}>
       <div className="action-row" onClick={onClick}>
         <div title="Comment" className="comment-container">
           <div className="svg-container">
@@ -70,11 +71,11 @@ const StyledWrapper = styled.div`
   }
 
   .action-row:hover .comment-icon {
-    fill: ${HOVER_COLOR};
+    fill: ${p => p.$hoverColor};
   }
 
   .action-row:hover .comment-count {
-    color: ${HOVER_COLOR};
+    color: ${p => p.$hoverColor};
   }
 
   .action-row:active .comment-container {

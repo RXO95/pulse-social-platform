@@ -20,8 +20,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "../context/AuthContext";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
 import api from "../api/client";
 import { timeAgo } from "../utils/helpers";
+import { parseContent } from "../utils/parseContent";
 
 export default function ProfileScreen({ navigation, route }) {
   const usernameParam = route.params?.username;
@@ -51,6 +53,7 @@ export default function ProfileScreen({ navigation, route }) {
   const { darkMode, toggleDarkMode, accentColor } = useTheme();
   const { logout } = useAuth();
   const t = getTheme(darkMode, accentColor);
+  const toast = useToast();
 
   const isOwnProfile = currentUser && profile && currentUser.username === profile.username;
 
@@ -82,7 +85,7 @@ export default function ProfileScreen({ navigation, route }) {
       const res = await api.get(`/users/${uname}`);
       setProfile(res.data);
     } catch {
-      Alert.alert("Error", "Failed to load profile");
+      toast("Failed to load profile", "error");
     } finally {
       setIsLoadingProfile(false);
     }
@@ -99,7 +102,9 @@ export default function ProfileScreen({ navigation, route }) {
           .filter((p) => p.username === uname)
           .map((p) => ({ ...p, translatedText: null, showTranslation: false }))
       );
-    } catch {} finally {
+    } catch {
+      toast("Could not load posts", "error");
+    } finally {
       setIsLoadingPosts(false);
     }
   };
@@ -111,7 +116,9 @@ export default function ProfileScreen({ navigation, route }) {
     try {
       const res = await api.get(`/reposts/user/${uname}`);
       setReposts(res.data);
-    } catch {} finally {
+    } catch {
+      toast("Could not load reposts", "error");
+    } finally {
       setIsLoadingReposts(false);
     }
   };
@@ -142,7 +149,7 @@ export default function ProfileScreen({ navigation, route }) {
       await api[method](`/follow/${profile.user_id}`);
       fetchProfile();
     } catch {
-      Alert.alert("Error", "Action failed");
+      toast("Action failed", "error");
     }
   };
 
@@ -190,7 +197,7 @@ export default function ProfileScreen({ navigation, route }) {
             await api.delete(`/posts/${postId}`);
             setPosts((prev) => prev.filter((p) => p._id !== postId));
           } catch {
-            Alert.alert("Error", "Failed to delete post");
+            toast("Failed to delete post", "error");
           }
         },
       },
@@ -205,7 +212,9 @@ export default function ProfileScreen({ navigation, route }) {
           p._id === postId ? { ...p, is_bookmarked: res.data.bookmarked } : p
         )
       );
-    } catch {}
+    } catch {
+      toast("Bookmark failed", "error");
+    }
   };
 
   const handleRepost = async (postId) => {
@@ -262,7 +271,7 @@ export default function ProfileScreen({ navigation, route }) {
       setQuoteContent("");
       fetchReposts();
     } catch (err) {
-      Alert.alert("Error", err.response?.data?.detail || "Failed to quote repost");
+      toast(err.response?.data?.detail || "Failed to quote repost", "error");
     } finally {
       setIsQuoting(false);
     }
@@ -288,7 +297,7 @@ export default function ProfileScreen({ navigation, route }) {
         return updated;
       });
     } catch {
-      Alert.alert("Error", "Translation failed");
+      toast("Translation failed", "error");
     }
   };
 
@@ -337,7 +346,7 @@ export default function ProfileScreen({ navigation, route }) {
       fetchProfile();
       fetchCurrentUser();
     } catch (err) {
-      Alert.alert("Error", err.response?.data?.detail || "Failed to update");
+      toast(err.response?.data?.detail || "Failed to update", "error");
     } finally {
       setIsSaving(false);
     }
@@ -393,7 +402,7 @@ export default function ProfileScreen({ navigation, route }) {
 
         {/* Content */}
         <Text style={[styles.postContent, { color: t.text }]}>
-          {post.showTranslation ? post.translatedText : post.content}
+          {parseContent(post.showTranslation ? post.translatedText : post.content, { navigation, accentColor: t.accentBlue })}
         </Text>
 
         {/* Media */}
@@ -496,7 +505,7 @@ export default function ProfileScreen({ navigation, route }) {
         {/* Repost label */}
         <View style={styles.repostLabel}>
           <Ionicons name="repeat" size={14} color="#00ba7c" />
-          <Text style={styles.repostLabelText}>@{repost.username} reposted</Text>
+          <Text style={[styles.repostLabelText, { color: "#00ba7c" }]}>@{repost.username} reposted</Text>
         </View>
 
         {/* Quote content */}
@@ -526,7 +535,7 @@ export default function ProfileScreen({ navigation, route }) {
             </View>
           </View>
           <Text style={[styles.postContent, { color: t.text, fontSize: 14 }]} numberOfLines={4}>
-            {orig.content || ""}
+            {parseContent(orig.content || "", { navigation, accentColor: t.accentBlue })}
           </Text>
           {orig.media_url ? (
             <Image source={{ uri: orig.media_url }} style={[styles.postMedia, { height: 150 }]} resizeMode="cover" />
@@ -542,7 +551,7 @@ export default function ProfileScreen({ navigation, route }) {
   const ProfileHeader = () => (
     <View>
       {/* Cover gradient */}
-      <View style={styles.coverGradient} />
+      <View style={[styles.coverGradient, { backgroundColor: t.accentBlue }]} />
 
       {/* Avatar */}
       <View style={styles.avatarContainer}>
@@ -565,6 +574,11 @@ export default function ProfileScreen({ navigation, route }) {
         ) : null}
 
         <View style={styles.statsRow}>
+          <View>
+            <Text style={[styles.statText, { color: t.text }]}>
+              <Text style={styles.statNumber}>{profile.stats?.posts ?? 0}</Text> Posts
+            </Text>
+          </View>
           <TouchableOpacity
             onPress={() =>
               navigation.navigate("FollowList", {
@@ -606,6 +620,7 @@ export default function ProfileScreen({ navigation, route }) {
             <TouchableOpacity
               style={[
                 styles.followBtn,
+                { backgroundColor: t.accentBlue },
                 profile.is_followed_by_user && { backgroundColor: "transparent", borderColor: t.border, borderWidth: 1 },
               ]}
               onPress={handleFollowToggle}
@@ -633,13 +648,13 @@ export default function ProfileScreen({ navigation, route }) {
       {/* Tab bar */}
       <View style={[styles.tabBar, { borderColor: t.border }]}>
         <TouchableOpacity
-          style={[styles.tab, activeTab === "posts" && styles.tabActive]}
+          style={[styles.tab, activeTab === "posts" && styles.tabActive, activeTab === "posts" && { borderBottomColor: t.accentBlue }]}
           onPress={() => setActiveTab("posts")}
         >
           <Text style={[styles.tabText, { color: activeTab === "posts" ? t.text : t.textSecondary }]}>Posts</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tab, activeTab === "reposts" && styles.tabActive]}
+          style={[styles.tab, activeTab === "reposts" && styles.tabActive, activeTab === "reposts" && { borderBottomColor: t.accentBlue }]}
           onPress={() => setActiveTab("reposts")}
         >
           <Text style={[styles.tabText, { color: activeTab === "reposts" ? t.text : t.textSecondary }]}>Reposts</Text>
@@ -652,7 +667,7 @@ export default function ProfileScreen({ navigation, route }) {
     <SafeAreaView style={[styles.container, { backgroundColor: t.bg }]} edges={["top"]}>
       {/* Nav */}
       <View style={[styles.navBar, { backgroundColor: t.headerBg, borderColor: t.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.canGoBack() ? navigation.goBack() : navigation.navigate("Feed")} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Ionicons name="arrow-back" size={24} color={t.text} />
         </TouchableOpacity>
         <Text style={[styles.navTitle, { color: t.text }]}>@{profile.username}</Text>
@@ -728,7 +743,7 @@ export default function ProfileScreen({ navigation, route }) {
               >
                 <Text style={{ color: t.text }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={saveProfile} disabled={isSaving}>
+              <TouchableOpacity style={[styles.modalSaveBtn, { backgroundColor: t.accentBlue }]} onPress={saveProfile} disabled={isSaving}>
                 {isSaving ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
@@ -744,7 +759,7 @@ export default function ProfileScreen({ navigation, route }) {
       <Modal
         visible={!!menuPostId}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setMenuPostId(null)}
       >
         <Pressable style={styles.menuOverlay} onPress={() => setMenuPostId(null)}>
@@ -771,7 +786,7 @@ export default function ProfileScreen({ navigation, route }) {
       <Modal
         visible={!!repostMenuPostId}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setRepostMenuPostId(null)}
       >
         <Pressable style={styles.menuOverlay} onPress={() => setRepostMenuPostId(null)}>
@@ -833,12 +848,12 @@ export default function ProfileScreen({ navigation, route }) {
               return (
                 <View style={[styles.quotePreview, { borderColor: t.border }]}>
                   <Text style={[styles.quotePreviewUser, { color: t.accent }]}>@{qPost.username}</Text>
-                  <Text style={[styles.quotePreviewText, { color: t.textSecondary }]} numberOfLines={3}>{qPost.content}</Text>
+                  <Text style={[styles.quotePreviewText, { color: t.textSecondary }]} numberOfLines={3}>{parseContent(qPost.content, { navigation, accentColor: t.accentBlue })}</Text>
                 </View>
               );
             })()}
             <TouchableOpacity
-              style={[styles.quoteSubmitBtn, { opacity: quoteContent.trim() ? 1 : 0.5 }]}
+              style={[styles.quoteSubmitBtn, { backgroundColor: "#00ba7c", opacity: quoteContent.trim() ? 1 : 0.5 }]}
               onPress={submitQuoteRepost}
               disabled={!quoteContent.trim() || isQuoting}
             >
@@ -932,7 +947,6 @@ const styles = StyleSheet.create({
 
   coverGradient: {
     height: 120,
-    backgroundColor: "#764ba2",
   },
   avatarContainer: { alignItems: "center", marginTop: -40 },
   avatarLarge: {
@@ -981,7 +995,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   followBtn: {
-    backgroundColor: "#0f1419",
     borderRadius: 9999,
     paddingVertical: 10,
     paddingHorizontal: 24,
@@ -992,7 +1005,7 @@ const styles = StyleSheet.create({
   postsHeaderText: { fontSize: 16, fontWeight: "700" },
   tabBar: { flexDirection: "row", borderBottomWidth: 1, marginTop: 16 },
   tab: { flex: 1, alignItems: "center", paddingVertical: 14 },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: "#00ba7c" },
+  tabActive: { borderBottomWidth: 2 },
   tabText: { fontSize: 15, fontWeight: "700" },
 
   postCard: {
@@ -1017,7 +1030,7 @@ const styles = StyleSheet.create({
   usernameRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
   username: { fontWeight: "700", fontSize: 15 },
   timestamp: { fontSize: 12, marginLeft: 4 },
-  menuBtn: { padding: 6 },
+  menuBtn: { padding: 10 },
   postContent: { fontSize: 15, lineHeight: 22, marginBottom: 8 },
   postMedia: { width: "100%", height: 200, borderRadius: 12, marginBottom: 8 },
   gifPostWrap: { position: "relative", marginBottom: 8 },
@@ -1071,13 +1084,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     gap: 12,
     borderBottomWidth: 0.5,
-    borderColor: "rgba(128,128,128,0.2)",
+    borderColor: "rgba(128,128,128,0.15)",
   },
   menuSheetText: { fontSize: 16, fontWeight: "600" },
 
   // Repost card
   repostLabel: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 },
-  repostLabelText: { fontSize: 13, fontWeight: "600", color: "#00ba7c" },
+  repostLabelText: { fontSize: 13, fontWeight: "600" },
   quotedPostCard: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 4 },
 
   // Quote repost modal
@@ -1089,7 +1102,7 @@ const styles = StyleSheet.create({
   quotePreview: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 16 },
   quotePreviewUser: { fontSize: 14, fontWeight: "700", marginBottom: 4 },
   quotePreviewText: { fontSize: 13 },
-  quoteSubmitBtn: { backgroundColor: "#00ba7c", borderRadius: 20, paddingVertical: 12, alignItems: "center" },
+  quoteSubmitBtn: { borderRadius: 20, paddingVertical: 12, alignItems: "center" },
   quoteSubmitText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 
   // Edit Profile Modal
@@ -1121,7 +1134,6 @@ const styles = StyleSheet.create({
   },
   modalSaveBtn: {
     flex: 1,
-    backgroundColor: "#0f1419",
     borderRadius: 9999,
     paddingVertical: 12,
     alignItems: "center",

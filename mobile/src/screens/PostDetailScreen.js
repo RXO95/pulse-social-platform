@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Linking,
@@ -15,13 +14,18 @@ import {
   Modal,
   Pressable,
   Dimensions,
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
+import * as Haptics from "expo-haptics";
 import GifPicker from "../components/GifPicker";
 import api from "../api/client";
 import { timeAgo } from "../utils/helpers";
+import { parseContent } from "../utils/parseContent";
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
@@ -57,6 +61,8 @@ export default function PostDetailScreen({ navigation, route }) {
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegeneratingContext, setIsRegeneratingContext] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Translation state
   const [translatedText, setTranslatedText] = useState(null);
@@ -70,6 +76,7 @@ export default function PostDetailScreen({ navigation, route }) {
 
   const { darkMode, accentColor } = useTheme();
   const t = getTheme(darkMode, accentColor);
+  const toast = useToast();
 
   const fetchPost = async () => {
     setIsLoading(true);
@@ -77,10 +84,26 @@ export default function PostDetailScreen({ navigation, route }) {
       const res = await api.get(`/posts/${postId}`);
       setPost(res.data);
     } catch {
-      Alert.alert("Error", "Post not found");
+      toast("Post not found", "error");
       navigation.goBack();
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const [postRes, commentsRes] = await Promise.all([
+        api.get(`/posts/${postId}`),
+        api.get(`/comments/${postId}`),
+      ]);
+      setPost(postRes.data);
+      setComments(commentsRes.data);
+    } catch {
+      toast("Could not refresh", "error");
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -88,11 +111,14 @@ export default function PostDetailScreen({ navigation, route }) {
     try {
       const res = await api.get(`/comments/${postId}`);
       setComments(res.data);
-    } catch {}
+    } catch {
+      toast("Could not load comments", "error");
+    }
   };
 
   const handleLike = async () => {
     if (!post) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const wasLiked = post.is_liked_by_user;
     setPost((p) => ({
       ...p,
@@ -109,10 +135,13 @@ export default function PostDetailScreen({ navigation, route }) {
 
   const handleBookmark = async () => {
     if (!post) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       const res = await api.post(`/bookmarks/${postId}`);
       setPost((p) => ({ ...p, is_bookmarked: res.data.bookmarked }));
-    } catch {}
+    } catch {
+      toast("Bookmark failed", "error");
+    }
   };
 
   const handleRepost = async () => {
@@ -157,7 +186,7 @@ export default function PostDetailScreen({ navigation, route }) {
       setQuoteContent("");
       fetchPost();
     } catch (err) {
-      Alert.alert("Error", err.response?.data?.detail || "Failed to quote repost");
+      toast(err.response?.data?.detail || "Failed to quote repost", "error");
     } finally {
       setIsQuoting(false);
     }
@@ -173,7 +202,7 @@ export default function PostDetailScreen({ navigation, route }) {
       setCommentGif(null);
       fetchComments();
     } catch {
-      Alert.alert("Error", "Failed to add comment");
+      toast("Failed to add comment", "error");
     }
   };
 
@@ -254,7 +283,7 @@ export default function PostDetailScreen({ navigation, route }) {
       setTranslatedText(res.data.translated_text);
       setShowTranslation(true);
     } catch {
-      Alert.alert("Error", "Translation failed");
+      toast("Translation failed", "error");
     }
   };
 
@@ -268,15 +297,41 @@ export default function PostDetailScreen({ navigation, route }) {
         context_data: res.data.context_data,
       }));
     } catch {
-      Alert.alert("Error", "Failed to regenerate context");
+      toast("Failed to regenerate context", "error");
     } finally {
       setIsRegeneratingContext(false);
     }
   };
 
+  const fetchCurrentUser = async () => {
+    try {
+      const res = await api.get("/users/me");
+      setCurrentUser(res.data);
+    } catch {}
+  };
+
+  const handleDeleteComment = (commentId) => {
+    Alert.alert("Delete Comment", "Delete this comment?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await api.delete(`/comments/${commentId}`);
+            setComments((prev) => prev.filter((c) => c._id !== commentId));
+          } catch {
+            toast("Failed to delete comment", "error");
+          }
+        },
+      },
+    ]);
+  };
+
   useEffect(() => {
     fetchPost();
     fetchComments();
+    fetchCurrentUser();
   }, [postId]);
 
   if (isLoading || !post) {
@@ -405,12 +460,19 @@ export default function PostDetailScreen({ navigation, route }) {
       <View style={{ flex: 1, marginLeft: 10 }}>
         <View style={styles.commentHeader}>
           <Text style={[styles.commentUser, { color: t.text }]}>@{item.username}</Text>
-          <Text style={{ color: t.textSecondary, fontSize: 12 }}>
-            {timeAgo(item.created_at)}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Text style={{ color: t.textSecondary, fontSize: 12 }}>
+              {timeAgo(item.created_at)}
+            </Text>
+            {currentUser && currentUser.username === item.username && (
+              <TouchableOpacity onPress={() => handleDeleteComment(item._id)} hitSlop={8}>
+                <Ionicons name="trash-outline" size={14} color={t.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
         {item.content ? (
-          <Text style={[styles.commentContent, { color: t.text }]}>{item.content}</Text>
+          <Text style={[styles.commentContent, { color: t.text }]}>{parseContent(item.content, { navigation, accentColor: t.accentBlue })}</Text>
         ) : null}
         {item.gif_url && (
           <View style={{ position: "relative", marginTop: 6 }}>
@@ -429,10 +491,10 @@ export default function PostDetailScreen({ navigation, route }) {
             <Ionicons
               name={item.is_liked_by_user ? "heart" : "heart-outline"}
               size={16}
-              color={item.is_liked_by_user ? "#F4212E" : t.textSecondary}
+              color={item.is_liked_by_user ? "#f91880" : t.textSecondary}
             />
             {(item.likes || 0) > 0 && (
-              <Text style={[styles.commentActionCount, { color: item.is_liked_by_user ? "#F4212E" : t.textSecondary }]}>
+              <Text style={[styles.commentActionCount, { color: item.is_liked_by_user ? "#f91880" : t.textSecondary }]}>
                 {item.likes}
               </Text>
             )}
@@ -484,7 +546,10 @@ export default function PostDetailScreen({ navigation, route }) {
 
       {/* Content */}
       <Text style={[styles.postContent, { color: t.text }]}>
-        {showTranslation ? translatedText : post.content}
+        {parseContent(showTranslation ? translatedText : post.content, { navigation, accentColor: t.accentBlue })}
+        {post.is_edited && (
+          <Text style={{ fontSize: 12, fontStyle: "italic", color: t.textSecondary }}> (edited)</Text>
+        )}
       </Text>
 
       {post.media_url && (
@@ -588,7 +653,7 @@ export default function PostDetailScreen({ navigation, route }) {
     <SafeAreaView style={[styles.container, { backgroundColor: t.bg }]} edges={["top"]}>
       {/* Nav */}
       <View style={[styles.navBar, { backgroundColor: t.headerBg, borderColor: t.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Ionicons name="arrow-back" size={24} color={t.text} />
         </TouchableOpacity>
         <Text style={[styles.navTitle, { color: t.text }]}>Post</Text>
@@ -606,6 +671,14 @@ export default function PostDetailScreen({ navigation, route }) {
           renderItem={renderComment}
           ListHeaderComponent={PostHeader}
           contentContainerStyle={{ paddingBottom: 80 }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={t.accentBlue}
+              colors={[t.accentBlue]}
+            />
+          }
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <Text style={{ color: t.textSecondary }}>No comments yet. Be the first!</Text>
@@ -654,7 +727,7 @@ export default function PostDetailScreen({ navigation, route }) {
       </KeyboardAvoidingView>
 
       {/* Repost menu bottom sheet */}
-      <Modal visible={showRepostMenu} transparent animationType="fade" onRequestClose={() => setShowRepostMenu(false)}>
+      <Modal visible={showRepostMenu} transparent animationType="slide" onRequestClose={() => setShowRepostMenu(false)}>
         <Pressable style={styles.menuOverlay} onPress={() => setShowRepostMenu(false)}>
           <View style={[styles.menuSheet, { backgroundColor: t.cardBg }]}>
             <TouchableOpacity style={styles.menuSheetItem} onPress={handleRepost}>
@@ -697,7 +770,7 @@ export default function PostDetailScreen({ navigation, route }) {
             {post && (
               <View style={[styles.quotePreview, { borderColor: t.border }]}>
                 <Text style={[styles.quotePreviewUser, { color: t.accent }]}>@{post.username}</Text>
-                <Text style={[styles.quotePreviewText, { color: t.textSecondary }]} numberOfLines={3}>{post.content}</Text>
+                <Text style={[styles.quotePreviewText, { color: t.textSecondary }]} numberOfLines={3}>{parseContent(post.content, { navigation, accentColor: t.accentBlue })}</Text>
               </View>
             )}
             <TouchableOpacity
@@ -907,7 +980,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    padding: 2,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
   },
   commentActionCount: {
     fontSize: 12,
@@ -936,8 +1010,8 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   menuOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
-  menuSheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 30, paddingTop: 8 },
-  menuSheetItem: { flexDirection: "row", alignItems: "center", paddingVertical: 16, paddingHorizontal: 24, gap: 12, borderBottomWidth: 0.5, borderColor: "rgba(128,128,128,0.2)" },
+  menuSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 30, paddingTop: 8 },
+  menuSheetItem: { flexDirection: "row", alignItems: "center", paddingVertical: 16, paddingHorizontal: 24, gap: 12, borderBottomWidth: 0.5, borderColor: "rgba(128,128,128,0.15)" },
   menuSheetText: { fontSize: 16, fontWeight: "600" },
   quoteOverlay: { flex: 1, justifyContent: "center", alignItems: "center" },
   quoteSheet: { width: "90%", borderRadius: 16, padding: 20 },

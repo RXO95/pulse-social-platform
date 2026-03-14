@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import api from "../api/client";
 import { timeAgo } from "../utils/helpers";
+import { parseContent } from "../utils/parseContent";
 
 export default function EntityExploreScreen({ navigation, route }) {
   const { entityText } = route.params;
@@ -57,14 +58,14 @@ export default function EntityExploreScreen({ navigation, route }) {
           </Text>
         </View>
       </View>
-      <Text style={[styles.postContent, { color: t.text }]}>{post.content}</Text>
+      <Text style={[styles.postContent, { color: t.text }]}>{parseContent(post.content, { navigation, accentColor: t.accentBlue })}</Text>
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: t.bg }]} edges={["top"]}>
       <View style={[styles.navBar, { backgroundColor: t.headerBg, borderColor: t.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Ionicons name="arrow-back" size={24} color={t.text} />
         </TouchableOpacity>
         <Text style={[styles.navTitle, { color: t.text }]}>{entityText}</Text>

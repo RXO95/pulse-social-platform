@@ -12,8 +12,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
+import * as Haptics from "expo-haptics";
 import api from "../api/client";
 import { timeAgo } from "../utils/helpers";
+import { parseContent } from "../utils/parseContent";
 
 export default function BookmarksScreen({ navigation }) {
   const [bookmarks, setBookmarks] = useState([]);
@@ -21,13 +24,16 @@ export default function BookmarksScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const { darkMode, accentColor } = useTheme();
   const t = getTheme(darkMode, accentColor);
+  const toast = useToast();
 
   const fetchBookmarks = async () => {
     try {
       setIsLoading(true);
       const res = await api.get("/bookmarks/");
       setBookmarks(res.data.bookmarks || []);
-    } catch {} finally {
+    } catch {
+      toast("Could not load bookmarks", "error");
+    } finally {
       setIsLoading(false);
     }
   };
@@ -39,13 +45,17 @@ export default function BookmarksScreen({ navigation }) {
   }, []);
 
   const handleRemoveBookmark = async (postId) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await api.post(`/bookmarks/${postId}`);
       setBookmarks((prev) => prev.filter((b) => b._id !== postId));
-    } catch {}
+    } catch {
+      toast("Could not remove bookmark", "error");
+    }
   };
 
   const handleLike = async (postId) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       const res = await api.post(`/likes/${postId}`);
       setBookmarks((prev) =>
@@ -55,7 +65,9 @@ export default function BookmarksScreen({ navigation }) {
             : p
         )
       );
-    } catch {}
+    } catch {
+      toast("Could not update like", "error");
+    }
   };
 
   useEffect(() => {
@@ -90,10 +102,25 @@ export default function BookmarksScreen({ navigation }) {
         </View>
       </View>
 
-      <Text style={[styles.postContent, { color: t.text }]}>{post.content}</Text>
+      <Text style={[styles.postContent, { color: t.text }]}>{parseContent(post.content, { navigation, accentColor: t.accentBlue })}</Text>
 
       {post.media_url && (
         <Image source={{ uri: post.media_url }} style={styles.postMedia} resizeMode="cover" />
+      )}
+
+      {/* Entity Tags */}
+      {post.entities?.length > 0 && (
+        <View style={styles.entityRow}>
+          {post.entities.map((e, idx) => (
+            <TouchableOpacity
+              key={idx}
+              style={[styles.entityTag, { backgroundColor: t.tagBg }]}
+              onPress={() => navigation.navigate("EntityExplore", { entityText: e.text })}
+            >
+              <Text style={[styles.entityTagText, { color: t.tagText }]}>{e.text} <Text style={{ fontSize: 10, color: t.textSecondary }}>{e.label}</Text></Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       )}
 
       <View style={styles.actionBar}>
@@ -104,6 +131,11 @@ export default function BookmarksScreen({ navigation }) {
             color={post.is_liked_by_user ? "#f91880" : t.textSecondary}
           />
           <Text style={{ color: t.textSecondary, fontSize: 13 }}>{post.likes || 0}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate("PostDetail", { postId: post._id })}>
+          <Ionicons name="chatbubble-outline" size={19} color={t.textSecondary} />
+          <Text style={{ color: t.textSecondary, fontSize: 13 }}>{post.comment_count || 0}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.actionBtn} onPress={() => handleRemoveBookmark(post._id)}>
@@ -139,6 +171,12 @@ export default function BookmarksScreen({ navigation }) {
               <Text style={{ color: t.textSecondary, marginTop: 12, fontSize: 15 }}>
                 No bookmarks yet
               </Text>
+              <TouchableOpacity
+                style={{ marginTop: 20, backgroundColor: t.accentBlue, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 9999 }}
+                onPress={() => navigation.navigate("Feed")}
+              >
+                <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>Browse Feed</Text>
+              </TouchableOpacity>
             </View>
           }
         />
@@ -179,5 +217,8 @@ const styles = StyleSheet.create({
   postMedia: { width: "100%", height: 180, borderRadius: 12, marginBottom: 8 },
   actionBar: { flexDirection: "row", gap: 20, marginTop: 4 },
   actionBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
+  entityRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6, marginBottom: 4 },
+  entityTag: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 9999 },
+  entityTagText: { fontSize: 13, fontWeight: "500" },
   emptyWrap: { alignItems: "center", marginTop: 60 },
 });

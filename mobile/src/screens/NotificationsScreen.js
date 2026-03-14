@@ -12,26 +12,9 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
 import api from "../api/client";
-
-/* ─── helpers ─── */
-function timeAgo(dateString) {
-  if (!dateString) return "";
-  const now = new Date();
-  let raw = String(dateString);
-  if (!raw.endsWith("Z") && !raw.includes("+")) raw += "Z";
-  const date = new Date(raw);
-  const seconds = Math.floor((now - date) / 1000);
-  if (seconds < 0) return "now";
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
+import { timeAgo } from "../utils/helpers";
 
 const TYPE_CFG = {
   like:         { icon: "heart",             color: "#f91880" },
@@ -44,6 +27,7 @@ const TYPE_CFG = {
 export default function NotificationsScreen({ navigation }) {
   const { darkMode, accentColor } = useTheme();
   const t = getTheme(darkMode, accentColor);
+  const toast = useToast();
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +38,7 @@ export default function NotificationsScreen({ navigation }) {
       const res = await api.get("/notifications/?limit=100");
       setItems(res.data || []);
     } catch {
+      toast("Could not load notifications", "error");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -80,17 +65,17 @@ export default function NotificationsScreen({ navigation }) {
   const messageText = (n) => {
     switch (n.type) {
       case "like":
-        return `liked your post${n.post_preview ? `: "${n.post_preview.slice(0, 40)}…"` : ""}`;
+        return `liked your post${n.post_preview ? `: "${n.post_preview.slice(0, 50)}..."` : ""}`;
       case "comment":
-        return `commented${n.comment_preview ? `: "${n.comment_preview.slice(0, 40)}…"` : " on your post"}`;
+        return `commented${n.comment_preview ? `: "${n.comment_preview.slice(0, 50)}..."` : " on your post"}`;
       case "follow":
         return "started following you";
       case "repost":
-        return `reposted your post${n.post_preview ? `: "${n.post_preview.slice(0, 40)}…"` : ""}`;
+        return `reposted your post${n.post_preview ? `: "${n.post_preview.slice(0, 50)}..."` : ""}`;
       case "quote_repost":
-        return `quoted your post${n.quote_content ? `: "${n.quote_content.slice(0, 40)}…"` : ""}`;
+        return `quoted your post${n.quote_content ? `: "${n.quote_content.slice(0, 50)}..."` : ""}`;
       default:
-        return "interacted with your content";
+        return "New notification";
     }
   };
 
@@ -107,7 +92,7 @@ export default function NotificationsScreen({ navigation }) {
           {n.actor_pic ? (
             <Image source={{ uri: n.actor_pic }} style={styles.avatar} />
           ) : (
-            <View style={[styles.avatar, { backgroundColor: t.accentBlue, justifyContent: "center", alignItems: "center" }]}>
+              <View style={[styles.avatar, { backgroundColor: t.avatarBg || "#ffd700", justifyContent: "center", alignItems: "center" }]}>
               <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>
                 {(n.actor_username || "?")[0].toUpperCase()}
               </Text>
@@ -152,11 +137,14 @@ export default function NotificationsScreen({ navigation }) {
           <Text style={{ color: t.textSecondary, marginTop: 12, fontSize: 16 }}>
             No notifications yet
           </Text>
+          <Text style={{ color: t.textSecondary, marginTop: 6, fontSize: 14, textAlign: "center", paddingHorizontal: 32 }}>
+            Follow people and interact with posts to see activity here
+          </Text>
         </View>
       ) : (
         <FlatList
           data={items}
-          keyExtractor={(_, i) => String(i)}
+          keyExtractor={(item, i) => item._id || String(i)}
           renderItem={renderNotification}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.accentBlue} />

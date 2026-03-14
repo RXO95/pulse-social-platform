@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import API from "../api/api";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import { useToast } from "../context/ToastContext";
 import GifPicker from "../components/GifPicker";
 import useIsMobile from "../hooks/useIsMobile";
 
 export default function Compose() {
+  const toast = useToast();
   const [content, setContent] = useState("");
   const [mediaFile, setMediaFile] = useState(null);
   const [mediaPreview, setMediaPreview] = useState(null);
@@ -14,6 +16,8 @@ export default function Compose() {
   const [showGifPicker, setShowGifPicker] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [quotePost, setQuotePost] = useState(null);
+  const [drafts, setDrafts] = useState([]);
+  const [showDrafts, setShowDrafts] = useState(false);
   const mediaInputRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -38,8 +42,54 @@ export default function Compose() {
         } catch {}
       })();
     }
+    fetchDrafts();
     setTimeout(() => textareaRef.current?.focus(), 200);
   }, [quotePostId, token]);
+
+  const fetchDrafts = async () => {
+    try {
+      const res = await fetch(`${API}/drafts/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setDrafts(await res.json());
+    } catch {}
+  };
+
+  const saveDraft = async () => {
+    if (!content.trim() && !gifUrl) return;
+    try {
+      await fetch(`${API}/drafts/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ content: content.trim(), gif_url: gifUrl || null }),
+      });
+      setContent("");
+      setGifUrl(null);
+      clearMedia();
+      fetchDrafts();
+      navigate(-1);
+    } catch { toast("Could not save draft", "error"); }
+  };
+
+  const loadDraft = (draft) => {
+    setContent(draft.content || "");
+    setGifUrl(draft.gif_url || null);
+    setShowDrafts(false);
+    fetch(`${API}/drafts/${draft._id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(() => fetchDrafts()).catch(() => {});
+  };
+
+  const deleteDraft = async (draftId) => {
+    try {
+      await fetch(`${API}/drafts/${draftId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      fetchDrafts();
+    } catch {}
+  };
 
   const handleMediaSelect = (e) => {
     const file = e.target.files[0];
@@ -81,7 +131,7 @@ export default function Compose() {
         });
         if (!res.ok) {
           const data = await res.json();
-          alert(data.detail || "Quote failed");
+          toast(data.detail || "Quote failed", "error");
           return;
         }
         navigate("/feed");
@@ -107,7 +157,7 @@ export default function Compose() {
         });
         if (!res.ok) {
           const data = await res.json();
-          alert(data.detail?.message || data.detail || "Post blocked");
+          toast(data.detail?.message || data.detail || "Post blocked", "error");
           return;
         }
       } else if (mediaFile) {
@@ -121,7 +171,7 @@ export default function Compose() {
         });
         if (!res.ok) {
           const data = await res.json();
-          alert(data.detail?.message || data.detail || "Post blocked");
+          toast(data.detail?.message || data.detail || "Post blocked", "error");
           return;
         }
       } else {
@@ -135,13 +185,13 @@ export default function Compose() {
         });
         if (!res.ok) {
           const data = await res.json();
-          alert(data.detail?.message || data.detail || "Post blocked");
+          toast(data.detail?.message || data.detail || "Post blocked", "error");
           return;
         }
       }
       navigate("/feed");
     } catch {
-      alert("Could not create post");
+      toast("Could not create post", "error");
     } finally {
       setIsPosting(false);
     }
@@ -159,6 +209,11 @@ export default function Compose() {
           </svg>
         </button>
         <span style={{ flex: 1 }} />
+        {(content.trim() || gifUrl) && !quotePostId && (
+          <button onClick={saveDraft} style={s.draftBtn}>
+            Draft
+          </button>
+        )}
         <button
           onClick={handlePost}
           disabled={isPosting || (!content.trim() && !mediaFile && !gifUrl)}
@@ -239,6 +294,26 @@ export default function Compose() {
             <path d="M3 5.5A2.5 2.5 0 015.5 3h13A2.5 2.5 0 0121 5.5v13a2.5 2.5 0 01-2.5 2.5h-13A2.5 2.5 0 013 18.5v-13zM5.5 5c-.28 0-.5.22-.5.5v13c0 .28.22.5.5.5h13c.28 0 .5-.22.5-.5v-13c0-.28-.22-.5-.5-.5h-13zM8 10h1.5v4H8v-4zm2.5 0H13c.55 0 1 .45 1 1v.5h-1.5v-.25h-1v2.5h1v-.25H14v.5c0 .55-.45 1-1 1h-2.5v-5zm4.5 0h3v1.25h-1.75v.5H18v1.25h-1.75V14H14.5v-4z" />
           </svg>
         </button>
+        {drafts.length > 0 && (
+          <div style={{ position: "relative", marginLeft: "auto" }}>
+            <button onClick={() => setShowDrafts(!showDrafts)} style={s.draftsBtn} title="Load a draft">
+              {drafts.length} draft{drafts.length > 1 ? "s" : ""}
+            </button>
+            {showDrafts && (
+              <div style={s.draftsPanel}>
+                <div style={s.draftsPanelHeader}>Your Drafts</div>
+                {drafts.map((d) => (
+                  <div key={d._id} style={s.draftItem}>
+                    <div style={s.draftItemContent} onClick={() => loadDraft(d)}>
+                      {d.content?.length > 80 ? d.content.slice(0, 80) + "..." : d.content || "(GIF only)"}
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); deleteDraft(d._id); }} style={s.draftItemDelete}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {showGifPicker && (
@@ -333,6 +408,40 @@ function getStyles(t, m, glass) {
       color: t.accentBlue || "#1d9bf0", padding: 8,
       borderRadius: "50%", display: "flex",
       alignItems: "center", justifyContent: "center",
+    },
+    draftBtn: {
+      backgroundColor: "transparent", color: t.textSecondary,
+      border: `1px solid ${t.border}`, borderRadius: 9999,
+      padding: "8px 16px", fontWeight: 600, fontSize: 14, cursor: "pointer",
+    },
+    draftsBtn: {
+      background: "none", border: "none", color: t.accentBlue || "#1d9bf0",
+      cursor: "pointer", fontSize: 13, fontWeight: 600, padding: "6px 8px",
+    },
+    draftsPanel: {
+      position: "absolute", bottom: "100%", left: 0, right: 0, minWidth: 280,
+      maxHeight: 260, overflowY: "auto",
+      backgroundColor: glass ? "rgba(30,30,30,0.95)" : t.cardBg,
+      border: `1px solid ${glass ? "rgba(255,255,255,0.2)" : t.border}`,
+      borderRadius: 12, boxShadow: "0 -4px 20px rgba(0,0,0,0.3)", zIndex: 100,
+      backdropFilter: glass ? "blur(40px)" : undefined,
+    },
+    draftsPanelHeader: {
+      padding: "10px 14px", fontWeight: 700, fontSize: 14, color: t.text,
+      borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}`,
+    },
+    draftItem: {
+      display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
+      borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.08)" : t.border}`,
+      cursor: "pointer",
+    },
+    draftItemContent: {
+      flex: 1, fontSize: 13, color: t.textSecondary, lineHeight: 1.4,
+      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+    },
+    draftItemDelete: {
+      background: "none", border: "none", color: "#e0245e",
+      cursor: "pointer", fontSize: 14, padding: 4, flexShrink: 0,
     },
   };
 }

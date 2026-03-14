@@ -1,21 +1,28 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/api";
+import { useToast } from "../context/ToastContext";
 import Loader from "../components/Loader";
 import StarsBackground from "../components/StarsBackground";
 import PulseLogo from "../components/PulseLogo";
 
 export default function Signup() {
+  const toast = useToast();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState(null);
   const navigate = useNavigate();
+  const usernameRef = useRef(null);
 
   useEffect(() => {
     document.documentElement.style.backgroundColor = "transparent";
     document.body.style.backgroundColor = "transparent";
+    usernameRef.current?.focus();
     return () => {
       document.documentElement.style.backgroundColor = "";
       document.body.style.backgroundColor = "";
@@ -26,12 +33,12 @@ export default function Signup() {
     e.preventDefault();
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match!");
+      toast("Passwords do not match", "error");
       return;
     }
 
     if (password.length < 6) {
-      alert("Password must be at least 6 characters long!");
+      toast("Password must be at least 6 characters", "error");
       return;
     }
 
@@ -48,16 +55,16 @@ export default function Signup() {
 
       if (!res.ok) {
         const data = await res.json();
-        alert(data.detail || "Signup failed");
+        toast(data.detail || "Signup failed", "error");
         setIsLoading(false);
         return;
       }
 
-      alert("Account created successfully! Please login.");
+      toast("Account created! Please login.", "success");
       navigate("/login");
 
     } catch {
-      alert("Server error");
+      toast("Server error", "error");
     } finally {
       setIsLoading(false);
     }
@@ -77,10 +84,13 @@ export default function Signup() {
             <div style={styles.inputGroup}>
               <label style={styles.label}>Username</label>
               <input
-                style={styles.input}
+                ref={usernameRef}
+                style={{...styles.input, borderColor: focusedField === "username" ? "rgba(139, 92, 246, 0.6)" : "rgba(255, 255, 255, 0.1)"}}
                 placeholder="johndoe"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                onFocus={() => setFocusedField("username")}
+                onBlur={() => setFocusedField(null)}
                 required
               />
             </div>
@@ -88,37 +98,63 @@ export default function Signup() {
             <div style={styles.inputGroup}>
               <label style={styles.label}>Email Address</label>
               <input
-                style={styles.input}
+                style={{...styles.input, borderColor: focusedField === "email" ? "rgba(139, 92, 246, 0.6)" : "rgba(255, 255, 255, 0.1)"}}
                 type="email"
                 placeholder="name@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onFocus={() => setFocusedField("email")}
+                onBlur={() => setFocusedField(null)}
                 required
               />
             </div>
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>Password</label>
-              <input
-                style={styles.input}
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <div style={{ position: "relative" }}>
+                <input
+                  style={{...styles.input, borderColor: focusedField === "password" ? "rgba(139, 92, 246, 0.6)" : "rgba(255, 255, 255, 0.1)", paddingRight: "44px"}}
+                  type={showPw ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setFocusedField("password")}
+                  onBlur={() => setFocusedField(null)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(!showPw)}
+                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4, color: "rgba(255,255,255,0.4)", fontSize: "13px", fontWeight: 500 }}
+                >{showPw ? "Hide" : "Show"}</button>
+              </div>
+              {password && password.length < 6 && (
+                <span style={{ fontSize: "12px", color: "#f4212e", marginTop: 2 }}>Min 6 characters</span>
+              )}
             </div>
 
             <div style={styles.inputGroup}>
               <label style={styles.label}>Confirm Password</label>
-              <input
-                style={styles.input}
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-              />
+              <div style={{ position: "relative" }}>
+                <input
+                  style={{...styles.input, borderColor: focusedField === "confirm" ? (confirmPassword && confirmPassword !== password ? "rgba(244,33,46,0.6)" : "rgba(139, 92, 246, 0.6)") : "rgba(255, 255, 255, 0.1)", paddingRight: "44px"}}
+                  type={showConfirmPw ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onFocus={() => setFocusedField("confirm")}
+                  onBlur={() => setFocusedField(null)}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPw(!showConfirmPw)}
+                  style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", padding: 4, color: "rgba(255,255,255,0.4)", fontSize: "13px", fontWeight: 500 }}
+                >{showConfirmPw ? "Hide" : "Show"}</button>
+              </div>
+              {confirmPassword && confirmPassword !== password && (
+                <span style={{ fontSize: "12px", color: "#f4212e", marginTop: 2 }}>Passwords do not match</span>
+              )}
             </div>
 
             {isLoading ? (
@@ -131,12 +167,13 @@ export default function Signup() {
           <div style={styles.footer}>
             <p style={styles.footerText}>
               Already have an account?{" "}
-              <span 
+              <button 
+                type="button"
                 onClick={() => navigate("/login")} 
-                style={styles.link}
+                style={{...styles.link, background: "none", border: "none", cursor: "pointer", fontSize: "inherit", fontFamily: "inherit", padding: 0}}
               >
                 Sign in
-              </span>
+              </button>
             </p>
           </div>
         </div>

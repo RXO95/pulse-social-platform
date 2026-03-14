@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useTheme, getTheme } from "../context/ThemeContext";
+import { parseContent } from "../utils/parseContent";
 import LikeButton from "../components/LikeButton";
 import CommentButton from "../components/CommentButton";
 import BookmarkButton from "../components/BookmarkButton";
@@ -9,24 +10,7 @@ import DarkModeToggle from "../components/DarkModeToggle";
 
 import PostLoader from "../components/PostLoader";
 import useIsMobile from "../hooks/useIsMobile";
-
-function timeAgo(dateString) {
-  if (!dateString) return "";
-  const now = new Date();
-  let raw = String(dateString);
-  if (!raw.endsWith("Z") && !raw.includes("+")) raw += "Z";
-  const date = new Date(raw);
-  const seconds = Math.floor((now - date) / 1000);
-  if (seconds < 0) return "now";
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
+import { timeAgo } from "../utils/timeAgo";
 
 export default function EntityExplore() {
   const { entityText } = useParams();
@@ -295,7 +279,7 @@ export default function EntityExplore() {
                 style={styles.postContent}
                 onClick={() => navigate(`/post/${p._id}`)}
               >
-                {p.content}
+                {parseContent(p.content, { navigate, accentColor: t.accentBlue })}
               </p>
 
               {/* Post Media */}

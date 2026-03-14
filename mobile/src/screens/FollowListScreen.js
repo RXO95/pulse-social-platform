@@ -81,7 +81,7 @@ export default function FollowListScreen({ navigation, route }) {
     <SafeAreaView style={[styles.container, { backgroundColor: t.bg }]} edges={["top"]}>
       {/* Nav */}
       <View style={[styles.navBar, { backgroundColor: t.headerBg, borderColor: t.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Ionicons name="arrow-back" size={24} color={t.text} />
         </TouchableOpacity>
         <Text style={[styles.navTitle, { color: t.text }]}>@{username}</Text>

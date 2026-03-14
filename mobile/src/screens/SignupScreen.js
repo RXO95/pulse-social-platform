@@ -13,6 +13,7 @@ import {
   Dimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { useToast } from "../context/ToastContext";
 import api from "../api/client";
 
 export default function SignupScreen({ navigation }) {
@@ -21,18 +22,19 @@ export default function SignupScreen({ navigation }) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const toast = useToast();
 
   const submit = async () => {
     if (!username.trim() || !email.trim() || !password.trim()) {
-      Alert.alert("Error", "Please fill in all fields");
+      toast("Please fill in all fields", "error");
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match!");
+      toast("Passwords do not match!", "error");
       return;
     }
     if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters long!");
+      toast("Password must be at least 6 characters long!", "error");
       return;
     }
 
@@ -44,7 +46,7 @@ export default function SignupScreen({ navigation }) {
       ]);
     } catch (err) {
       const msg = err.response?.data?.detail || "Signup failed. Please try again.";
-      Alert.alert("Signup Failed", msg);
+      toast(msg || "Signup failed", "error");
     } finally {
       setIsLoading(false);
     }

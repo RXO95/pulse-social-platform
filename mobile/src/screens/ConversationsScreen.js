@@ -234,10 +234,13 @@ export default function ConversationsScreen({ navigation }) {
         <Ionicons name="search-outline" size={18} color={t.textSecondary} style={{ marginRight: 8 }} />
         <TextInput
           style={s(t).searchInput}
-          placeholder="Search users to message…"
+          placeholder="Search users to message..."
           placeholderTextColor={t.textSecondary}
           value={searchQuery}
           onChangeText={handleSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
         />
       </View>
 
