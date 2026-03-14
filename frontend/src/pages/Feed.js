@@ -18,6 +18,7 @@ import PulseLogo from "../components/PulseLogo";
 import useIsMobile from "../hooks/useIsMobile";
 import WeatherWidget from "../components/WeatherWidget";
 import NewsWidget from "../components/NewsWidget";
+import WhoToFollow from "../components/WhoToFollow";
 import { timeAgo } from "../utils/timeAgo";
 
 /* ─── Swipeable Widget Carousel ─── */
@@ -137,7 +138,8 @@ function WidgetCarousel({ theme: t }) {
 export default function Feed() {
   const toast = useToast();
   const confirm = useConfirm();
-  const { posts, setPosts, hasFetched, setHasFetched, scrollPosition, setScrollPosition } = useFeed();
+  const { posts, setPosts, hasFetched, setHasFetched, scrollPosition, setScrollPosition, nextCursor, setNextCursor, hasMore, setHasMore } = useFeed();
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [trending, setTrending] = useState([]);
   const [content, setContent] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -199,23 +201,49 @@ export default function Feed() {
     if (searchQuery) return; // Don't overwrite search results
     try {
       if (showLoader && !hasFetched) setIsLoading(true);
-      const res = await fetch(`${API}/posts/`, {
+      const res = await fetch(`${API}/feed/`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) { logout(); return; }
       const data = await res.json();
       // Initialize translation properties for each post
-      const processedPosts = data.map(p => ({
+      const processedPosts = (data.posts || []).map(p => ({
         ...p,
         translatedText: null,
         showTranslation: false
       }));
       setPosts(processedPosts);
+      setNextCursor(data.next_cursor || null);
+      setHasMore(data.has_more ?? false);
       setHasFetched(true);
     } catch {
       toast("Failed to load feed", "error");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadMorePosts = async () => {
+    if (isLoadingMore || !hasMore || !nextCursor || searchQuery) return;
+    setIsLoadingMore(true);
+    try {
+      const res = await fetch(`${API}/feed/?cursor=${nextCursor}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const morePosts = (data.posts || []).map(p => ({
+        ...p,
+        translatedText: null,
+        showTranslation: false
+      }));
+      setPosts(prev => [...prev, ...morePosts]);
+      setNextCursor(data.next_cursor || null);
+      setHasMore(data.has_more ?? false);
+    } catch {
+      toast("Could not load more posts", "error");
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -565,6 +593,21 @@ export default function Feed() {
     };
     // eslint-disable-next-line
   }, [hasFetched, scrollPosition]);
+
+  // Infinite scroll – load more when near bottom
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 600 &&
+        !isLoadingMore && hasMore && !searchQuery
+      ) {
+        loadMorePosts();
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+    // eslint-disable-next-line
+  }, [isLoadingMore, hasMore, nextCursor, searchQuery]);
 
   // Track latest post ID for new-posts banner
   useEffect(() => {
@@ -926,10 +969,27 @@ export default function Feed() {
             {hasNewPosts && (
               <div
                 style={styles.newPostsBanner}
-                onClick={() => {
+                onClick={async () => {
                   setHasNewPosts(false);
-                  fetchPosts(false);
                   window.scrollTo({ top: 0, behavior: "smooth" });
+                  // Fetch the latest page of posts
+                  try {
+                    const res = await fetch(`${API}/feed/`, {
+                      headers: { Authorization: `Bearer ${token}` },
+                    });
+                    if (res.ok) {
+                      const data = await res.json();
+                      const freshPosts = (data.posts || []).map(p => ({
+                        ...p, translatedText: null, showTranslation: false,
+                      }));
+                      // Find truly new posts by comparing IDs
+                      const existingIds = new Set(posts.map(p => p._id));
+                      const newPosts = freshPosts.filter(p => !existingIds.has(p._id));
+                      if (newPosts.length > 0) {
+                        setPosts(prev => [...newPosts, ...prev]);
+                      }
+                    }
+                  } catch {}
                 }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1165,6 +1225,30 @@ export default function Feed() {
                 </div>
               ))
             )}
+
+            {/* Infinite Scroll Loading Indicator */}
+            {isLoadingMore && (
+              <div style={{ display: "flex", justifyContent: "center", padding: "24px 0" }}>
+                <div style={{
+                  width: 28, height: 28,
+                  border: `3px solid ${t.border}`,
+                  borderTop: `3px solid ${t.accentBlue}`,
+                  borderRadius: "50%",
+                  animation: "spin 0.8s linear infinite",
+                }} />
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              </div>
+            )}
+
+            {/* End of feed */}
+            {!hasMore && posts.length > 0 && !searchQuery && (
+              <div style={{
+                textAlign: "center", padding: "24px 0", color: t.textSecondary,
+                fontSize: "13px", fontStyle: "italic",
+              }}>
+                You've reached the end of the feed ✨
+              </div>
+            )}
           </div>
         </main>
 
@@ -1207,6 +1291,9 @@ export default function Feed() {
               <p style={{ fontSize: "14px", color: t.textSecondary, textAlign: "center", padding: "24px 16px", margin: 0 }}>Nothing trending yet...</p>
             )}
           </div>
+
+          {/* ── Who to Follow ── */}
+          <WhoToFollow theme={t} />
 
           {/* ── Swipeable Widget Carousel ── */}
           <WidgetCarousel theme={t} />

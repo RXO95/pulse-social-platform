@@ -6,6 +6,8 @@ export const FeedProvider = ({ children }) => {
   const [posts, setPosts] = useState([]);
   const [hasFetched, setHasFetched] = useState(false);
   const [scrollPosition, setScrollPosition] = useState(0);
+  const [nextCursor, setNextCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
 
   return (
     <FeedContext.Provider
@@ -16,6 +18,10 @@ export const FeedProvider = ({ children }) => {
         setHasFetched,
         scrollPosition,
         setScrollPosition,
+        nextCursor,
+        setNextCursor,
+        hasMore,
+        setHasMore,
       }}
     >
       {children}
