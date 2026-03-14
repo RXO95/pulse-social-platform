@@ -14,10 +14,12 @@ import {
   StyleSheet,
   Animated,
   Dimensions,
+  Share,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
+import * as Haptics from "expo-haptics";
 import { useAuth } from "../context/AuthContext";
 import { useTheme, getTheme } from "../context/ThemeContext";
 import { useToast } from "../context/ToastContext";
@@ -42,6 +44,11 @@ export default function ProfileScreen({ navigation, route }) {
   const [quotePostId, setQuotePostId] = useState(null);
   const [quoteContent, setQuoteContent] = useState("");
   const [isQuoting, setIsQuoting] = useState(false);
+
+  // Edit post state
+  const [editPostId, setEditPostId] = useState(null);
+  const [editContent, setEditContent] = useState("");
+  const [isEditSaving, setIsEditSaving] = useState(false);
 
   // Edit state
   const [isEditing, setIsEditing] = useState(false);
@@ -74,7 +81,7 @@ export default function ProfileScreen({ navigation, route }) {
     try {
       const res = await api.get("/users/me");
       setCurrentUser(res.data);
-    } catch {}
+    } catch { }
   };
 
   const fetchProfile = async () => {
@@ -157,6 +164,7 @@ export default function ProfileScreen({ navigation, route }) {
   const handleLike = async (postId) => {
     const post = posts.find((p) => p._id === postId);
     if (!post) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const wasLiked = post.is_liked_by_user;
     // Optimistic update
     setPosts((prev) =>
@@ -167,11 +175,8 @@ export default function ProfileScreen({ navigation, route }) {
       )
     );
     try {
-      if (wasLiked) {
-        await api.delete(`/likes/${postId}`);
-      } else {
-        await api.post(`/likes/${postId}`);
-      }
+      // Backend uses a single toggle endpoint (POST only)
+      await api.post(`/likes/${postId}`);
     } catch {
       // Revert on failure
       setPosts((prev) =>
@@ -182,6 +187,16 @@ export default function ProfileScreen({ navigation, route }) {
         )
       );
     }
+  };
+
+  const handleShare = async (postId) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await Share.share({
+        message: `https://webpulse.social/post/${postId}`,
+        url: `https://webpulse.social/post/${postId}`,
+      });
+    } catch { }
   };
 
   // ─── Delete ───
@@ -205,6 +220,7 @@ export default function ProfileScreen({ navigation, route }) {
   };
 
   const handleBookmark = async (postId) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       const res = await api.post(`/bookmarks/${postId}`);
       setPosts((prev) =>
@@ -226,12 +242,12 @@ export default function ProfileScreen({ navigation, route }) {
       prev.map((p) =>
         p._id === postId
           ? {
-              ...p,
-              is_reposted_by_user: !wasReposted,
-              repost_count: wasReposted
-                ? (p.repost_count || 1) - 1
-                : (p.repost_count || 0) + 1,
-            }
+            ...p,
+            is_reposted_by_user: !wasReposted,
+            repost_count: wasReposted
+              ? (p.repost_count || 1) - 1
+              : (p.repost_count || 0) + 1,
+          }
           : p
       )
     );
@@ -301,6 +317,36 @@ export default function ProfileScreen({ navigation, route }) {
     }
   };
 
+  // ─── Edit Post ───
+  const openEditPost = (postId) => {
+    setMenuPostId(null);
+    const post = posts.find((p) => p._id === postId);
+    if (!post) return;
+    setEditPostId(postId);
+    setEditContent(post.content || "");
+  };
+
+  const handleEditPost = async () => {
+    if (!editContent.trim() || !editPostId) return;
+    setIsEditSaving(true);
+    try {
+      await api.put(`/posts/${editPostId}`, { content: editContent.trim() });
+      setPosts((prev) =>
+        prev.map((p) =>
+          p._id === editPostId
+            ? { ...p, content: editContent.trim(), is_edited: true }
+            : p
+        )
+      );
+      setEditPostId(null);
+      setEditContent("");
+    } catch (err) {
+      toast(err.response?.data?.detail || "Failed to edit post", "error");
+    } finally {
+      setIsEditSaving(false);
+    }
+  };
+
   // ─── Edit Profile ───
   const openEdit = () => {
     setEditUsername(profile.username || "");
@@ -311,7 +357,7 @@ export default function ProfileScreen({ navigation, route }) {
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -492,6 +538,10 @@ export default function ProfileScreen({ navigation, route }) {
               size={20}
               color={post.is_bookmarked ? t.accentBlue : t.textSecondary}
             />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionBtn} onPress={() => handleShare(post._id)}>
+            <Ionicons name="share-outline" size={20} color={t.textSecondary} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -772,6 +822,13 @@ export default function ProfileScreen({ navigation, route }) {
               <Text style={[styles.menuSheetText, { color: t.riskText }]}>Delete Post</Text>
             </TouchableOpacity>
             <TouchableOpacity
+              style={styles.menuSheetItem}
+              onPress={() => openEditPost(menuPostId)}
+            >
+              <Ionicons name="create-outline" size={20} color={t.accentBlue} />
+              <Text style={[styles.menuSheetText, { color: t.text }]}>Edit Post</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
               style={[styles.menuSheetItem, { borderBottomWidth: 0 }]}
               onPress={() => setMenuPostId(null)}
             >
@@ -858,6 +915,41 @@ export default function ProfileScreen({ navigation, route }) {
               disabled={!quoteContent.trim() || isQuoting}
             >
               <Text style={styles.quoteSubmitText}>{isQuoting ? "Posting..." : "Post"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit post modal */}
+      <Modal
+        visible={!!editPostId}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditPostId(null)}
+      >
+        <View style={[styles.quoteOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+          <View style={[styles.quoteSheet, { backgroundColor: t.cardBg }]}>
+            <View style={styles.quoteHeader}>
+              <Text style={[styles.quoteTitle, { color: t.text }]}>Edit Post</Text>
+              <TouchableOpacity onPress={() => setEditPostId(null)}>
+                <Ionicons name="close" size={24} color={t.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={[styles.quoteInput, { color: t.text, borderColor: t.border, minHeight: 120 }]}
+              placeholder="Edit your post..."
+              placeholderTextColor={t.textSecondary}
+              value={editContent}
+              onChangeText={setEditContent}
+              multiline
+              autoFocus
+            />
+            <TouchableOpacity
+              style={[styles.quoteSubmitBtn, { backgroundColor: t.accentBlue, opacity: editContent.trim() ? 1 : 0.5 }]}
+              onPress={handleEditPost}
+              disabled={!editContent.trim() || isEditSaving}
+            >
+              <Text style={styles.quoteSubmitText}>{isEditSaving ? "Saving..." : "Save"}</Text>
             </TouchableOpacity>
           </View>
         </View>

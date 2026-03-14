@@ -14,6 +14,7 @@ import RepostButton from "../components/RepostButton";
 import Loader from "../components/Loader";
 import PostLoader from "../components/PostLoader";
 import useIsMobile from "../hooks/useIsMobile";
+import ImageCropperPopup from "../components/ImageCropperPopup";
 
 export default function Profile() {
   const toast = useToast();
@@ -27,6 +28,8 @@ export default function Profile() {
   const [editBio, setEditBio] = useState("");
   const [editPicture, setEditPicture] = useState(null);
   const [picturePreview, setPicturePreview] = useState(null);
+  const [showCropper, setShowCropper] = useState(false);
+  const [tempImageSrc, setTempImageSrc] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
@@ -217,9 +220,21 @@ export default function Profile() {
     }
   };
 
-  const handleSharePost = (postId) => {
+  const handleSharePost = async (postId) => {
     const url = `${window.location.origin}/post/${postId}`;
-    if (navigator.clipboard) {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Pulse',
+          text: 'Check out this post on Pulse',
+          url: url,
+        });
+      } catch (err) {
+        if (err.name !== 'AbortError' && navigator.clipboard) {
+          navigator.clipboard.writeText(url).then(() => toast("Link copied to clipboard"));
+        }
+      }
+    } else if (navigator.clipboard) {
       navigator.clipboard.writeText(url).then(() => toast("Link copied to clipboard"));
     } else {
       toast("Could not copy link", "error");
@@ -275,9 +290,24 @@ export default function Profile() {
   const handlePictureSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setEditPicture(file);
-      setPicturePreview(URL.createObjectURL(file));
+      setTempImageSrc(URL.createObjectURL(file));
+      setShowCropper(true);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
+  };
+
+  const handleCropComplete = (croppedBlob) => {
+    setEditPicture(croppedBlob);
+    setPicturePreview(URL.createObjectURL(croppedBlob));
+    setShowCropper(false);
+    setTempImageSrc(null);
+  };
+
+  const handleCropCancel = () => {
+    setShowCropper(false);
+    setTempImageSrc(null);
   };
 
   // Save profile
@@ -290,7 +320,7 @@ export default function Profile() {
       }
       formData.append("bio", editBio);
       if (editPicture) {
-        formData.append("profile_picture", editPicture);
+        formData.append("profile_picture", editPicture, "profile.jpg");
       }
 
       const res = await fetch(`${API}/users/me`, {
@@ -653,6 +683,16 @@ export default function Profile() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* CROP MODAL */}
+      {showCropper && tempImageSrc && (
+        <ImageCropperPopup
+          imageSrc={tempImageSrc}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+          theme={t}
+        />
       )}
     </div>
   );

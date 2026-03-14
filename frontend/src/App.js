@@ -3,6 +3,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ToastProvider } from "./context/ToastContext";
 import { ConfirmProvider } from "./context/ConfirmContext";
+import { FeedProvider } from "./context/FeedContext";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Feed from "./pages/Feed";
@@ -25,6 +26,7 @@ export default function App() {
     <ToastProvider>
     <ConfirmProvider>
     <AuthProvider>
+    <FeedProvider>
       <BrowserRouter>
         <Routes>
 
@@ -49,6 +51,7 @@ export default function App() {
 
         </Routes>
       </BrowserRouter>
+    </FeedProvider>
     </AuthProvider>
     </ConfirmProvider>
     </ToastProvider>

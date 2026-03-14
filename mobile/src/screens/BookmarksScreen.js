@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -8,6 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   StyleSheet,
+  Share,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -46,10 +48,14 @@ export default function BookmarksScreen({ navigation }) {
 
   const handleRemoveBookmark = async (postId) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Optimistic removal
+    const prevBookmarks = bookmarks;
+    setBookmarks((prev) => prev.filter((b) => b._id !== postId));
     try {
       await api.post(`/bookmarks/${postId}`);
-      setBookmarks((prev) => prev.filter((b) => b._id !== postId));
     } catch {
+      // Revert on failure
+      setBookmarks(prevBookmarks);
       toast("Could not remove bookmark", "error");
     }
   };
@@ -70,9 +76,21 @@ export default function BookmarksScreen({ navigation }) {
     }
   };
 
-  useEffect(() => {
-    fetchBookmarks();
-  }, []);
+  const handleShare = async (postId) => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await Share.share({
+        message: `https://webpulse.social/post/${postId}`,
+        url: `https://webpulse.social/post/${postId}`,
+      });
+    } catch { }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchBookmarks();
+    }, [])
+  );
 
   const renderBookmark = ({ item: post }) => (
     <TouchableOpacity
@@ -141,6 +159,10 @@ export default function BookmarksScreen({ navigation }) {
         <TouchableOpacity style={styles.actionBtn} onPress={() => handleRemoveBookmark(post._id)}>
           <Ionicons name="bookmark" size={20} color={t.accentBlue} />
           <Text style={{ color: t.textSecondary, fontSize: 13 }}>Remove</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionBtn} onPress={() => handleShare(post._id)}>
+          <Ionicons name="share-outline" size={20} color={t.textSecondary} />
         </TouchableOpacity>
       </View>
     </TouchableOpacity>

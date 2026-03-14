@@ -24,8 +24,8 @@ const sendSound = typeof Audio !== "undefined" ? new Audio("/happy-pop-2.mp3") :
 const recvSound = typeof Audio !== "undefined" ? new Audio("/happy-pop-3.mp3") : null;
 if (sendSound) sendSound.volume = 0.5;
 if (recvSound) recvSound.volume = 0.5;
-function playSend() { try { if (sendSound) { sendSound.currentTime = 0; sendSound.play(); } } catch {} }
-function playRecv() { try { if (recvSound) { recvSound.currentTime = 0; recvSound.play(); } } catch {} }
+function playSend() { try { if (sendSound) { sendSound.currentTime = 0; sendSound.play(); } } catch { } }
+function playRecv() { try { if (recvSound) { recvSound.currentTime = 0; recvSound.play(); } } catch { } }
 
 /* ══════════════════════════════════════════════════════════════════
    Messages page — conversation list + inline chat
@@ -348,6 +348,7 @@ export default function Messages() {
       }
     } catch (err) {
       console.error("Send failed:", err);
+      toast("Failed to send message", "error");
     } finally {
       setIsSending(false);
     }
@@ -403,7 +404,7 @@ export default function Messages() {
           const plain = await decryptMessage(msg.ciphertext, msg.iv, key);
           setDecryptedCache((prev) => ({ ...prev, [msg._id]: plain }));
           if (isMine) {
-            try { localStorage.setItem(`pulse_dm_${msg._id}`, plain); } catch {}
+            try { localStorage.setItem(`pulse_dm_${msg._id}`, plain); } catch { }
           }
           return plain;
         } catch {
@@ -423,7 +424,7 @@ export default function Messages() {
                 const plain = await decryptMessage(msg.ciphertext, msg.iv, key);
                 setDecryptedCache((prev) => ({ ...prev, [msg._id]: plain }));
                 if (isMine) {
-                  try { localStorage.setItem(`pulse_dm_${msg._id}`, plain); } catch {}
+                  try { localStorage.setItem(`pulse_dm_${msg._id}`, plain); } catch { }
                 }
                 return plain;
               } catch { continue; }
@@ -462,12 +463,12 @@ export default function Messages() {
   /* ─── emoji data ─── */
 
   const emojiSections = [
-    { label: "Smileys", emojis: ["😀","😂","🤣","😊","😍","🥰","😘","😎","🤩","🥳","😜","🤗","🤔","😏","😢","😭","😤","🤯","🥺","😴"] },
-    { label: "Gestures", emojis: ["👍","👎","👏","🙌","🤝","✌️","🤞","💪","🫶","🫡","👋","🤙","🙏","🫂","👀","🤌"] },
-    { label: "Hearts", emojis: ["❤️","🧡","💛","💚","💙","💜","🖤","🤍","💔","❤️‍🔥","💕","💗","💖","💘","💝"] },
-    { label: "Animals", emojis: ["🐶","🐱","🐼","🦊","🦁","🐸","🐵","🦄","🐝","🦋","🐢","🐬","🐧","🦜","🐻"] },
-    { label: "Food", emojis: ["🍕","🍔","🌮","🍣","🍩","🍪","🎂","☕","🍺","🥂","🍷","🍑","🍓","🥑","🔥"] },
-    { label: "Activities", emojis: ["⚽","🏀","🎮","🎵","🎬","📸","✈️","🚀","🌍","⭐","🎉","🎊","🏆","💡","💯"] },
+    { label: "Smileys", emojis: ["😀", "😂", "🤣", "😊", "😍", "🥰", "😘", "😎", "🤩", "🥳", "😜", "🤗", "🤔", "😏", "😢", "😭", "😤", "🤯", "🥺", "😴"] },
+    { label: "Gestures", emojis: ["👍", "👎", "👏", "🙌", "🤝", "✌️", "🤞", "💪", "🫶", "🫡", "👋", "🤙", "🙏", "🫂", "👀", "🤌"] },
+    { label: "Hearts", emojis: ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💔", "❤️‍🔥", "💕", "💗", "💖", "💘", "💝"] },
+    { label: "Animals", emojis: ["🐶", "🐱", "🐼", "🦊", "🦁", "🐸", "🐵", "🦄", "🐝", "🦋", "🐢", "🐬", "🐧", "🦜", "🐻"] },
+    { label: "Food", emojis: ["🍕", "🍔", "🌮", "🍣", "🍩", "🍪", "🎂", "☕", "🍺", "🥂", "🍷", "🍑", "🍓", "🥑", "🔥"] },
+    { label: "Activities", emojis: ["⚽", "🏀", "🎮", "🎵", "🎬", "📸", "✈️", "🚀", "🌍", "⭐", "🎉", "🎊", "🏆", "💡", "💯"] },
   ];
 
   const insertEmoji = (emoji) => {
@@ -553,7 +554,7 @@ export default function Messages() {
                   <div style={{ fontSize: 12, color: '#00ba7c', fontStyle: 'italic', fontWeight: 500 }}>typing...</div>
                 ) : (
                   <div style={s.e2eLabel}>
-                    <svg viewBox="0 0 24 24" width="12" height="12" fill="#00ba7c" style={{ marginRight: 4 }}><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="#00ba7c" style={{ marginRight: 4 }}><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z" /></svg>
                     End-to-end encrypted
                   </div>
                 )}
@@ -562,11 +563,11 @@ export default function Messages() {
           </div>
           <div style={s.messagesArea}>
             <div style={s.e2eBanner}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill={t.textSecondary}><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill={t.textSecondary}><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z" /></svg>
               <span>Messages are end-to-end encrypted. No one outside of this chat can read them.</span>
             </div>
             {messages.map((msg) => (
-              <MessageBubble key={msg._id} msg={{...msg, _replyText: msg.reply_to ? (decryptedCache[msg.reply_to] || null) : null}} isMine={msg.sender_id === currentUser?._id} getDecryptedText={getDecryptedText} theme={t} onReply={handleReply} onReact={handleReact} onDelete={handleDeleteMessage} onInfo={handleInfo} currentUserId={currentUser?._id} />
+              <MessageBubble key={msg._id} msg={{ ...msg, _replyText: msg.reply_to ? (decryptedCache[msg.reply_to] || null) : null }} isMine={msg.sender_id === currentUser?._id} getDecryptedText={getDecryptedText} theme={t} onReply={handleReply} onReact={handleReact} onDelete={handleDeleteMessage} onInfo={handleInfo} currentUserId={currentUser?._id} />
             ))}
             <div ref={messagesEndRef} />
           </div>
@@ -587,24 +588,24 @@ export default function Messages() {
           )}
           {/* GIF preview */}
           {msgGifUrl && (
-            <div style={{padding: "8px 12px", borderTop: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 8}}>
-              <img src={msgGifUrl} alt="GIF" style={{height: 60, borderRadius: 8}} />
-              <button onClick={() => setMsgGifUrl(null)} style={{background: "none", border: "none", color: t.textSecondary, fontSize: 18, cursor: "pointer"}}>✕</button>
+            <div style={{ padding: "8px 12px", borderTop: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+              <img src={msgGifUrl} alt="GIF" style={{ height: 60, borderRadius: 8 }} />
+              <button onClick={() => setMsgGifUrl(null)} style={{ background: "none", border: "none", color: t.textSecondary, fontSize: 18, cursor: "pointer" }}>✕</button>
             </div>
           )}
           <div style={s.composeBar}>
             <button style={s.emojiToggle} onClick={() => setShowEmoji((v) => !v)}>
-              <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? t.accentBlue : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? t.accentBlue : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" /></svg>
             </button>
-            <button style={{...s.emojiToggle, marginLeft: 0}} onClick={() => setShowGifPicker(true)}>
-              <span style={{fontWeight: 800, fontSize: 13, color: t.textSecondary}}>GIF</span>
+            <button style={{ ...s.emojiToggle, marginLeft: 0 }} onClick={() => setShowGifPicker(true)}>
+              <span style={{ fontWeight: 800, fontSize: 13, color: t.textSecondary }}>GIF</span>
             </button>
             <input data-compose-input style={s.composeInput} placeholder="Message…" value={draft}
               onChange={(e) => { setDraft(e.target.value); emitTyping(); }}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
               onFocus={() => setShowEmoji(false)} />
             <button style={{ ...s.sendBtn, opacity: (draft.trim() || msgGifUrl) ? 1 : 0.4 }} onClick={handleSend} disabled={isSending || (!draft.trim() && !msgGifUrl)}>
-              {isSending ? "…" : <svg viewBox="0 0 24 24" width="20" height="20" fill="#fff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>}
+              {isSending ? "…" : <svg viewBox="0 0 24 24" width="20" height="20" fill="#fff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>}
             </button>
           </div>
           {showGifPicker && <GifPicker theme={t} onSelect={(url) => { setMsgGifUrl(url); setShowGifPicker(false); }} onClose={() => setShowGifPicker(false)} />}
@@ -637,7 +638,7 @@ export default function Messages() {
         <div style={s.sidebarHeader}>
           <h1 style={s.headerTitle}>Messages</h1>
           <button style={s.newChatBtn} title="New message" onClick={() => document.querySelector('[data-search-input]')?.focus()}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill={t.text}><path d="M22 6.01l-4-3.99L6 14.01V18h4L22 6.01zM4 20h16v2H4v-2z"/></svg>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill={t.text}><path d="M22 6.01l-4-3.99L6 14.01V18h4L22 6.01zM4 20h16v2H4v-2z" /></svg>
           </button>
         </div>
         {renderSearchBar()}
@@ -665,7 +666,7 @@ export default function Messages() {
                     <div style={{ fontSize: 11, color: '#00ba7c', fontStyle: 'italic', fontWeight: 500 }}>typing...</div>
                   ) : (
                     <div style={s.e2eLabel}>
-                      <svg viewBox="0 0 24 24" width="11" height="11" fill="#00ba7c" style={{ marginRight: 3 }}><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>
+                      <svg viewBox="0 0 24 24" width="11" height="11" fill="#00ba7c" style={{ marginRight: 3 }}><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z" /></svg>
                       Encrypted
                     </div>
                   )}
@@ -674,11 +675,11 @@ export default function Messages() {
             </div>
             <div style={s.messagesArea}>
               <div style={s.e2eBanner}>
-                <svg viewBox="0 0 24 24" width="14" height="14" fill={t.textSecondary}><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill={t.textSecondary}><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z" /></svg>
                 <span>Messages are end-to-end encrypted. No one outside of this chat can read them.</span>
               </div>
               {messages.map((msg) => (
-                <MessageBubble key={msg._id} msg={{...msg, _replyText: msg.reply_to ? (decryptedCache[msg.reply_to] || null) : null}} isMine={msg.sender_id === currentUser?._id} getDecryptedText={getDecryptedText} theme={t} onReply={handleReply} onReact={handleReact} onDelete={handleDeleteMessage} onInfo={handleInfo} currentUserId={currentUser?._id} />
+                <MessageBubble key={msg._id} msg={{ ...msg, _replyText: msg.reply_to ? (decryptedCache[msg.reply_to] || null) : null }} isMine={msg.sender_id === currentUser?._id} getDecryptedText={getDecryptedText} theme={t} onReply={handleReply} onReact={handleReact} onDelete={handleDeleteMessage} onInfo={handleInfo} currentUserId={currentUser?._id} />
               ))}
               <div ref={messagesEndRef} />
             </div>
@@ -699,24 +700,24 @@ export default function Messages() {
             )}
             {/* GIF preview */}
             {msgGifUrl && (
-              <div style={{padding: "8px 12px", borderTop: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 8}}>
-                <img src={msgGifUrl} alt="GIF" style={{height: 60, borderRadius: 8}} />
-                <button onClick={() => setMsgGifUrl(null)} style={{background: "none", border: "none", color: t.textSecondary, fontSize: 18, cursor: "pointer"}}>✕</button>
+              <div style={{ padding: "8px 12px", borderTop: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 8 }}>
+                <img src={msgGifUrl} alt="GIF" style={{ height: 60, borderRadius: 8 }} />
+                <button onClick={() => setMsgGifUrl(null)} style={{ background: "none", border: "none", color: t.textSecondary, fontSize: 18, cursor: "pointer" }}>✕</button>
               </div>
             )}
             <div style={s.composeBar}>
               <button style={s.emojiToggle} onClick={() => setShowEmoji((v) => !v)}>
-                <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? t.accentBlue : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>
+                <svg viewBox="0 0 24 24" width="22" height="22" fill={showEmoji ? t.accentBlue : t.textSecondary}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" /></svg>
               </button>
-              <button style={{...s.emojiToggle, marginLeft: 0}} onClick={() => setShowGifPicker(true)}>
-                <span style={{fontWeight: 800, fontSize: 13, color: t.textSecondary}}>GIF</span>
+              <button style={{ ...s.emojiToggle, marginLeft: 0 }} onClick={() => setShowGifPicker(true)}>
+                <span style={{ fontWeight: 800, fontSize: 13, color: t.textSecondary }}>GIF</span>
               </button>
               <input data-compose-input style={s.composeInput} placeholder="Message…" value={draft}
                 onChange={(e) => { setDraft(e.target.value); emitTyping(); }}
                 onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
                 onFocus={() => setShowEmoji(false)} />
               <button style={{ ...s.sendBtn, opacity: (draft.trim() || msgGifUrl) ? 1 : 0.4 }} onClick={handleSend} disabled={isSending || (!draft.trim() && !msgGifUrl)}>
-                {isSending ? "…" : <svg viewBox="0 0 24 24" width="20" height="20" fill="#fff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>}
+                {isSending ? "…" : <svg viewBox="0 0 24 24" width="20" height="20" fill="#fff"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>}
               </button>
             </div>
           </>
@@ -724,8 +725,8 @@ export default function Messages() {
           <div style={s.chatEmpty}>
             <div style={s.chatEmptyIcon}>
               <svg viewBox="0 0 24 24" width="56" height="56" fill={t.textSecondary} style={{ opacity: 0.3 }}>
-                <path d="M1.998 5.5c0-1.381 1.119-2.5 2.5-2.5h15c1.381 0 2.5 1.119 2.5 2.5v13c0 1.381-1.119 2.5-2.5 2.5h-15c-1.381 0-2.5-1.119-2.5-2.5v-13zm2.5-.5c-.276 0-.5.224-.5.5v13c0 .276.224.5.5.5h15c.276 0 .5-.224.5-.5v-13c0-.276-.224-.5-.5-.5h-15z"/>
-                <path d="M5.998 8h12v1.5h-12V8zm0 4h8v1.5h-8V12z"/>
+                <path d="M1.998 5.5c0-1.381 1.119-2.5 2.5-2.5h15c1.381 0 2.5 1.119 2.5 2.5v13c0 1.381-1.119 2.5-2.5 2.5h-15c-1.381 0-2.5-1.119-2.5-2.5v-13zm2.5-.5c-.276 0-.5.224-.5.5v13c0 .276.224.5.5.5h15c.276 0 .5-.224.5-.5v-13c0-.276-.224-.5-.5-.5h-15z" />
+                <path d="M5.998 8h12v1.5h-12V8zm0 4h8v1.5h-8V12z" />
               </svg>
             </div>
             <div style={s.chatEmptyTitle}>Your messages</div>
@@ -749,9 +750,9 @@ export default function Messages() {
                   <div style={{ fontSize: 13, color: t.textSecondary, marginBottom: 2 }}>Status</div>
                   <div style={{ fontSize: 15, color: t.text, display: "flex", alignItems: "center", gap: 6 }}>
                     {infoModal.read ? (
-                      <><svg viewBox="0 0 24 24" width="16" height="16" fill={t.accentBlue}><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z"/></svg> Read</>
+                      <><svg viewBox="0 0 24 24" width="16" height="16" fill={t.accentBlue}><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.48 12l-1.41 1.41L11.66 19l12-12-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.83 12 .41 13.41z" /></svg> Read</>
                     ) : (
-                      <><svg viewBox="0 0 24 24" width="16" height="16" fill={t.textSecondary}><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Delivered</>
+                      <><svg viewBox="0 0 24 24" width="16" height="16" fill={t.textSecondary}><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg> Delivered</>
                     )}
                   </div>
                 </div>
@@ -771,8 +772,8 @@ export default function Messages() {
       <div style={s.searchBar}>
         <div style={s.searchInputWrap}>
           <svg viewBox="0 0 24 24" width="16" height="16" fill={t.textSecondary} style={{ flexShrink: 0 }}>
-            <path d="M10.25 3.75a6.5 6.5 0 100 13 6.5 6.5 0 000-13zm-8.5 6.5a8.5 8.5 0 1117 0 8.5 8.5 0 01-17 0z"/>
-            <path d="M15.44 15.44l4.773 4.773 1.06-1.06-4.773-4.773-1.06 1.06z"/>
+            <path d="M10.25 3.75a6.5 6.5 0 100 13 6.5 6.5 0 000-13zm-8.5 6.5a8.5 8.5 0 1117 0 8.5 8.5 0 01-17 0z" />
+            <path d="M15.44 15.44l4.773 4.773 1.06-1.06-4.773-4.773-1.06 1.06z" />
           </svg>
           <input data-search-input style={s.searchInput} placeholder="Search…" value={searchQuery} onChange={(e) => handleSearch(e.target.value)} />
           {searchQuery && <button style={s.clearSearchBtn} onClick={() => { setSearchQuery(""); setSearchResults([]); }}>✕</button>}
@@ -851,7 +852,7 @@ export default function Messages() {
               </div>
               <div style={s.convPreview}>
                 <svg viewBox="0 0 24 24" width="12" height="12" fill={t.textSecondary} style={{ marginRight: 4, flexShrink: 0 }}>
-                  <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/>
+                  <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z" />
                 </svg>
                 <span>Encrypted message</span>
                 {conv.unread_count > 0 && <span style={s.unreadBadge}>{conv.unread_count}</span>}
@@ -918,25 +919,25 @@ function MessageBubble({ msg, isMine, getDecryptedText, theme: t, onReply, onRea
   const menuItems = [
     {
       label: "Reply",
-      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z"/></svg>,
+      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}><path d="M10 9V5l-7 7 7 7v-4.1c5 0 8.5 1.6 11 5.1-1-5-4-10-11-11z" /></svg>,
       action: () => { onReply(msg, text); setShowMenu(false); },
     },
     {
       label: "React",
-      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"/></svg>,
+      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zm3.5-9c.828 0 1.5-.672 1.5-1.5S16.328 8 15.5 8 14 8.672 14 9.5s.672 1.5 1.5 1.5zm-7 0c.828 0 1.5-.672 1.5-1.5S9.328 8 8.5 8 7 8.672 7 9.5 7.672 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" /></svg>,
       action: () => { setShowMenu(false); setShowReactPicker(true); },
     },
     {
       label: "Copy",
-      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>,
+      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" /></svg>,
       action: () => {
-        navigator.clipboard?.writeText(text).catch(() => {});
+        navigator.clipboard?.writeText(text).catch(() => { });
         setShowMenu(false);
       },
     },
     {
       label: "Info",
-      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>,
+      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill={t.text}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" /></svg>,
       action: () => { onInfo(msg, fullTimestamp); setShowMenu(false); },
     },
   ];
@@ -945,7 +946,7 @@ function MessageBubble({ msg, isMine, getDecryptedText, theme: t, onReply, onRea
   if (isMine) {
     menuItems.push({
       label: "Delete",
-      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="#f4212e"><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z"/></svg>,
+      icon: <svg viewBox="0 0 24 24" width="18" height="18" fill="#f4212e"><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z" /></svg>,
       action: () => { onDelete(msg._id); setShowMenu(false); },
       danger: true,
     });
@@ -994,7 +995,7 @@ function MessageBubble({ msg, isMine, getDecryptedText, theme: t, onReply, onRea
           onMouseEnter={(e) => e.currentTarget.style.backgroundColor = t.inputBg}
           onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}
         >
-          <svg viewBox="0 0 24 24" width="16" height="16" fill={t.textSecondary}><path d="M7 10l5 5 5-5z"/></svg>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill={t.textSecondary}><path d="M7 10l5 5 5-5z" /></svg>
         </button>
 
         {/* The bubble */}
@@ -1026,7 +1027,7 @@ function MessageBubble({ msg, isMine, getDecryptedText, theme: t, onReply, onRea
             </div>
           )}
           {msg.gif_url && (
-            <img src={msg.gif_url} alt="GIF" style={{maxWidth: "100%", borderRadius: 10, marginBottom: text && text !== "sent a GIF" ? 6 : 0}} />
+            <img src={msg.gif_url} alt="GIF" style={{ maxWidth: "100%", borderRadius: 10, marginBottom: text && text !== "sent a GIF" ? 6 : 0 }} />
           )}
           {(!msg.gif_url || (text && text !== "sent a GIF")) && text}
           <div style={{

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useToast } from "../context/ToastContext";
 import { useNavigate } from "react-router-dom";
 import API from "../api/api";
 import { useTheme, getTheme } from "../context/ThemeContext";
@@ -12,6 +13,7 @@ import useIsMobile from "../hooks/useIsMobile";
 import { timeAgo } from "../utils/timeAgo";
 
 export default function Bookmarks() {
+  const toast = useToast();
   const navigate = useNavigate();
   const [bookmarks, setBookmarks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,7 +35,7 @@ export default function Bookmarks() {
         setBookmarks(data.bookmarks || []);
       }
     } catch {
-      console.error("Failed to load bookmarks");
+      toast("Could not load bookmarks", "error");
     } finally {
       setIsLoading(false);
     }
@@ -54,17 +56,22 @@ export default function Bookmarks() {
   };
 
   const handleRemoveBookmark = async (postId) => {
+    // Optimistic removal
+    const removed = bookmarks.find(b => b._id === postId);
+    setBookmarks(prev => prev.filter(b => b._id !== postId));
     try {
       const res = await fetch(`${API}/bookmarks/${postId}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) {
-        // Remove from UI
-        setBookmarks(bookmarks.filter(b => b._id !== postId));
+      if (!res.ok) {
+        // Revert on failure
+        if (removed) setBookmarks(prev => [...prev, removed]);
+        toast("Could not remove bookmark", "error");
       }
     } catch {
-      console.error("Remove bookmark failed");
+      if (removed) setBookmarks(prev => [...prev, removed]);
+      toast("Could not remove bookmark", "error");
     }
   };
 
@@ -76,7 +83,7 @@ export default function Bookmarks() {
       if (res.ok) {
         setCurrentUser(await res.json());
       }
-    } catch {}
+    } catch { }
   };
 
   useEffect(() => {
@@ -89,10 +96,10 @@ export default function Bookmarks() {
       <header style={styles.navBar}>
         <div style={styles.navContent}>
           <button onClick={() => navigate(-1)} style={styles.backButton}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.414 13l5.043 5.04-1.414 1.42L3.586 12l7.457-7.46 1.414 1.42L7.414 11H21v2H7.414z"/></svg>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M7.414 13l5.043 5.04-1.414 1.42L3.586 12l7.457-7.46 1.414 1.42L7.414 11H21v2H7.414z" /></svg>
           </button>
-          <h3 style={{margin:0, color: t.text}}>Bookmarks</h3>
-          {mobile && <div style={{marginLeft: "auto"}}><DarkModeToggle /></div>}
+          <h3 style={{ margin: 0, color: t.text }}>Bookmarks</h3>
+          {mobile && <div style={{ marginLeft: "auto" }}><DarkModeToggle /></div>}
         </div>
       </header>
 
@@ -107,7 +114,7 @@ export default function Bookmarks() {
           <div style={styles.emptyState}>
             <div style={styles.emptyIcon}>
               <svg viewBox="0 0 24 24" width="48" height="48" fill={t.textSecondary}>
-                <path d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5z"/>
+                <path d="M4 4.5C4 3.12 5.119 2 6.5 2h11C18.881 2 20 3.12 20 4.5v18.44l-8-5.71-8 5.71V4.5z" />
               </svg>
             </div>
             <h3 style={styles.emptyTitle}>No bookmarks yet</h3>
@@ -123,13 +130,13 @@ export default function Bookmarks() {
                 <div style={styles.postHeader}>
                   <div style={styles.avatar}>
                     {p.profile_pic_url ? (
-                      <img src={p.profile_pic_url} alt="" style={{width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover"}} />
+                      <img src={p.profile_pic_url} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
                     ) : (
                       p.username?.charAt(0).toUpperCase()
                     )}
                   </div>
                   <div style={styles.postMeta}>
-                    <strong 
+                    <strong
                       style={styles.username}
                       onClick={() => navigate(`/profile/${p.username}`)}
                     >
@@ -139,7 +146,7 @@ export default function Bookmarks() {
                   </div>
                 </div>
 
-                <p 
+                <p
                   style={styles.postContent}
                   onClick={() => navigate(`/post/${p._id}`)}
                 >
@@ -159,9 +166,9 @@ export default function Bookmarks() {
 
                 <div style={styles.entityContainer}>
                   {p.entities?.map((e, idx) => (
-                    <span 
-                      key={idx} 
-                      style={{...styles.tag, cursor: "pointer"}}
+                    <span
+                      key={idx}
+                      style={{ ...styles.tag, cursor: "pointer" }}
                       onClick={() => navigate(`/entity/${encodeURIComponent(e.text)}`)}
                     >
                       {e.text} <small style={styles.tagLabel}>{e.label}</small>
@@ -170,16 +177,16 @@ export default function Bookmarks() {
                 </div>
 
                 <div style={styles.actionSection}>
-                  <LikeButton 
-                    isLiked={p.is_liked_by_user} 
+                  <LikeButton
+                    isLiked={p.is_liked_by_user}
                     count={p.likes || 0}
                     onLike={() => handleLike(p._id)}
                   />
-                  <CommentButton 
+                  <CommentButton
                     onClick={() => navigate(`/post/${p._id}`)}
                     count={p.comment_count || 0}
                   />
-                  <BookmarkButton 
+                  <BookmarkButton
                     isBookmarked={true}
                     onToggle={() => handleRemoveBookmark(p._id)}
                   />
@@ -193,36 +200,38 @@ export default function Bookmarks() {
   );
 }
 
-function getStyles(t, m, bg) { const glass = bg && bg !== "none"; return {
-  fullScreenWrapper: { flex: 1, display: "flex", flexDirection: "column", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text },
-  navBar: { height: "53px", backgroundColor: glass ? "rgba(255,255,255,0.14)" : t.headerBg, borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)", WebkitBackdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)", transition: "background-color 0.3s" },
-  navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
-  backButton: { background: "none", border: "none", cursor: "pointer", padding: "8px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: t.text, flexShrink: 0 },
-  scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", paddingBottom: m ? "70px" : "0", borderLeft: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, borderRight: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, ...(glass && { backdropFilter: "blur(40px) saturate(1.8)", WebkitBackdropFilter: "blur(40px) saturate(1.8)", backgroundColor: "rgba(255,255,255,0.1)" }) },
+function getStyles(t, m, bg) {
+  const glass = bg && bg !== "none"; return {
+    fullScreenWrapper: { flex: 1, display: "flex", flexDirection: "column", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', overflow: "hidden", color: t.text },
+    navBar: { height: "53px", backgroundColor: glass ? "rgba(255,255,255,0.14)" : t.headerBg, borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, display: "flex", alignItems: "center", justifyContent: "center", position: "sticky", top: 0, zIndex: 100, backdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)", WebkitBackdropFilter: glass ? "blur(40px) saturate(1.8)" : "blur(12px)", transition: "background-color 0.3s" },
+    navContent: { width: "100%", maxWidth: "600px", display: "flex", alignItems: "center", gap: m ? "12px" : "20px", padding: m ? "0 12px" : "0 20px" },
+    backButton: { background: "none", border: "none", cursor: "pointer", padding: "8px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", color: t.text, flexShrink: 0 },
+    scrollArea: { flex: 1, overflowY: "auto", maxWidth: "600px", width: "100%", margin: "0 auto", paddingBottom: m ? "70px" : "0", borderLeft: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, borderRight: m ? "none" : `1px solid ${glass ? "rgba(255,255,255,0.18)" : t.border}`, ...(glass && { backdropFilter: "blur(40px) saturate(1.8)", WebkitBackdropFilter: "blur(40px) saturate(1.8)", backgroundColor: "rgba(255,255,255,0.1)" }) },
 
-  emptyState: { textAlign: "center", padding: "60px 20px" },
-  emptyIcon: { marginBottom: "16px" },
-  emptyTitle: { fontSize: "20px", fontWeight: "700", color: t.text, margin: "0 0 8px 0" },
-  emptyText: { color: t.textSecondary, fontSize: "15px" },
+    emptyState: { textAlign: "center", padding: "60px 20px" },
+    emptyIcon: { marginBottom: "16px" },
+    emptyTitle: { fontSize: "20px", fontWeight: "700", color: t.text, margin: "0 0 8px 0" },
+    emptyText: { color: t.textSecondary, fontSize: "15px" },
 
-  headerBar: { padding: "16px 20px", borderBottom: `1px solid ${t.border}` },
-  countBadge: { color: t.textSecondary, fontSize: "14px" },
+    headerBar: { padding: "16px 20px", borderBottom: `1px solid ${t.border}` },
+    countBadge: { color: t.textSecondary, fontSize: "14px" },
 
-  postsSection: { padding: 0 },
-  postCard: { backgroundColor: glass ? "rgba(255,255,255,0.1)" : t.cardBg, padding: m ? "12px 16px 4px" : "16px 20px 4px", borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}`, transition: "background-color 0.15s" },
-  postHeader: { display: "flex", alignItems: "center", marginBottom: "8px" },
-  avatar: { width: "38px", height: "38px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", marginRight: "12px", fontWeight: "700", color: "#1a1a1a", fontSize: "15px", flexShrink: 0 },
-  postMeta: { display: "flex", alignItems: "center", gap: "4px" },
-  username: { fontSize: "15px", fontWeight: "700", color: t.text, cursor: "pointer" },
-  timestamp: { fontSize: "14px", color: t.textSecondary },
-  postContent: { fontSize: "15px", lineHeight: "1.5", margin: "4px 0 8px 0", color: t.text, wordBreak: "break-word", cursor: "pointer" },
-  
-  // Media styles
-  mediaContainer: { marginTop: "12px", marginBottom: "12px", borderRadius: "16px", overflow: "hidden", maxHeight: m ? "250px" : "400px", border: `1px solid ${t.border}`, cursor: "pointer" },
-  media: { width: "100%", maxHeight: m ? "250px" : "400px", objectFit: "cover", display: "block" },
-  
-  entityContainer: { display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" },
-  tag: { backgroundColor: t.tagBg, color: t.tagText, padding: "3px 10px", borderRadius: "9999px", fontSize: "13px", fontWeight: "500" },
-  tagLabel: { color: t.textSecondary, fontSize: "11px", marginLeft: "2px" },
-  actionSection: { display: "flex", alignItems: "center", gap: m ? "16px" : "24px", marginTop: "8px", paddingTop: "4px" }
-}; }
+    postsSection: { padding: 0 },
+    postCard: { backgroundColor: glass ? "rgba(255,255,255,0.1)" : t.cardBg, padding: m ? "12px 16px 4px" : "16px 20px 4px", borderBottom: `1px solid ${glass ? "rgba(255,255,255,0.15)" : t.border}`, transition: "background-color 0.15s" },
+    postHeader: { display: "flex", alignItems: "center", marginBottom: "8px" },
+    avatar: { width: "38px", height: "38px", borderRadius: "50%", backgroundColor: t.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", marginRight: "12px", fontWeight: "700", color: "#1a1a1a", fontSize: "15px", flexShrink: 0 },
+    postMeta: { display: "flex", alignItems: "center", gap: "4px" },
+    username: { fontSize: "15px", fontWeight: "700", color: t.text, cursor: "pointer" },
+    timestamp: { fontSize: "14px", color: t.textSecondary },
+    postContent: { fontSize: "15px", lineHeight: "1.5", margin: "4px 0 8px 0", color: t.text, wordBreak: "break-word", cursor: "pointer" },
+
+    // Media styles
+    mediaContainer: { marginTop: "12px", marginBottom: "12px", borderRadius: "16px", overflow: "hidden", maxHeight: m ? "250px" : "400px", border: `1px solid ${t.border}`, cursor: "pointer" },
+    media: { width: "100%", maxHeight: m ? "250px" : "400px", objectFit: "cover", display: "block" },
+
+    entityContainer: { display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" },
+    tag: { backgroundColor: t.tagBg, color: t.tagText, padding: "3px 10px", borderRadius: "9999px", fontSize: "13px", fontWeight: "500" },
+    tagLabel: { color: t.textSecondary, fontSize: "11px", marginLeft: "2px" },
+    actionSection: { display: "flex", alignItems: "center", gap: m ? "16px" : "24px", marginTop: "8px", paddingTop: "4px" }
+  };
+}

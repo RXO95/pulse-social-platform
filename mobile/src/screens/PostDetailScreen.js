@@ -16,6 +16,7 @@ import {
   Dimensions,
   RefreshControl,
   Alert,
+  Share,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -301,6 +302,16 @@ export default function PostDetailScreen({ navigation, route }) {
     } finally {
       setIsRegeneratingContext(false);
     }
+  };
+
+  const handleShare = async () => {
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await Share.share({
+        message: `https://webpulse.social/post/${postId}`,
+        url: `https://webpulse.social/post/${postId}`,
+      });
+    } catch { }
   };
 
   const fetchCurrentUser = async () => {
@@ -630,6 +641,10 @@ export default function PostDetailScreen({ navigation, route }) {
             size={22}
             color={post.is_bookmarked ? t.accentBlue : t.textSecondary}
           />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
+          <Ionicons name="share-outline" size={22} color={t.textSecondary} />
         </TouchableOpacity>
       </View>
 

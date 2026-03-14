@@ -14,12 +14,12 @@ export function parseContent(text, { navigate, accentColor = "#1d9bf0" } = {}) {
 
   // Match @username (alphanumeric + underscores, 1-30 chars)
   const mentionRegex = /(@[A-Za-z0-9_]{1,30})/g;
+  // Separate non-global regex for testing (avoids lastIndex bug with global regex)
+  const mentionTest = /^@[A-Za-z0-9_]{1,30}$/;
   const parts = text.split(mentionRegex);
 
   return parts.map((part, i) => {
-    if (mentionRegex.test(part)) {
-      // Reset regex lastIndex (since we reuse it)
-      mentionRegex.lastIndex = 0;
+    if (mentionTest.test(part)) {
       const username = part.slice(1); // remove @
       return (
         <span
@@ -38,8 +38,6 @@ export function parseContent(text, { navigate, accentColor = "#1d9bf0" } = {}) {
         </span>
       );
     }
-    // Reset regex lastIndex
-    mentionRegex.lastIndex = 0;
     return <span key={i}>{part}</span>;
   });
 }

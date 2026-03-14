@@ -37,7 +37,7 @@ const AutoGif = ({ uri, style }) => {
       Image.getSize(
         uri,
         (w, h) => { if (w && h) setRatio(w / h); },
-        () => {}
+        () => { }
       );
     }
   }, [uri]);
@@ -98,10 +98,12 @@ export default function FeedScreen({ navigation }) {
     try {
       const res = await api.get("/users/me");
       setCurrentUser(res.data);
-    } catch {}
+    } catch { }
   };
 
   const fetchPosts = async (showLoader = true) => {
+    // Don't overwrite search results
+    if (searchQuery.trim()) return;
     try {
       if (showLoader) setIsLoading(true);
       const res = await api.get("/posts/");
@@ -148,7 +150,7 @@ export default function FeedScreen({ navigation }) {
         if (latestId && latestId !== latestPostIdRef.current) {
           setHasNewPosts(true);
         }
-      } catch {}
+      } catch { }
     }, 30000);
     return () => clearInterval(interval);
   }, [searchQuery]);
@@ -193,7 +195,7 @@ export default function FeedScreen({ navigation }) {
         message: `https://webpulse.social/post/${postId}`,
         url: `https://webpulse.social/post/${postId}`,
       });
-    } catch {}
+    } catch { }
   };
 
   // ─── Skeleton loader ───
@@ -292,10 +294,10 @@ export default function FeedScreen({ navigation }) {
       prev.map((p) =>
         p._id === postId
           ? {
-              ...p,
-              is_liked_by_user: !wasLiked,
-              likes: wasLiked ? p.likes - 1 : p.likes + 1,
-            }
+            ...p,
+            is_liked_by_user: !wasLiked,
+            likes: wasLiked ? p.likes - 1 : p.likes + 1,
+          }
           : p
       )
     );
@@ -344,12 +346,12 @@ export default function FeedScreen({ navigation }) {
       prev.map((p) =>
         p._id === postId
           ? {
-              ...p,
-              is_reposted_by_user: !wasReposted,
-              repost_count: wasReposted
-                ? (p.repost_count || 1) - 1
-                : (p.repost_count || 0) + 1,
-            }
+            ...p,
+            is_reposted_by_user: !wasReposted,
+            repost_count: wasReposted
+              ? (p.repost_count || 1) - 1
+              : (p.repost_count || 0) + 1,
+          }
           : p
       )
     );
@@ -360,10 +362,10 @@ export default function FeedScreen({ navigation }) {
         prev.map((p) =>
           p._id === postId
             ? {
-                ...p,
-                is_reposted_by_user: res.data.reposted,
-                repost_count: res.data.repost_count,
-              }
+              ...p,
+              is_reposted_by_user: res.data.reposted,
+              repost_count: res.data.repost_count,
+            }
             : p
         )
       );
@@ -372,10 +374,10 @@ export default function FeedScreen({ navigation }) {
         prev.map((p) =>
           p._id === postId
             ? {
-                ...p,
-                is_reposted_by_user: wasReposted,
-                repost_count: post.repost_count || 0,
-              }
+              ...p,
+              is_reposted_by_user: wasReposted,
+              repost_count: post.repost_count || 0,
+            }
             : p
         )
       );
@@ -472,7 +474,7 @@ export default function FeedScreen({ navigation }) {
     try {
       const res = await api.get("/drafts/");
       setDrafts(res.data);
-    } catch {}
+    } catch { }
   };
 
   const saveDraft = async () => {
@@ -491,11 +493,11 @@ export default function FeedScreen({ navigation }) {
     setContent(draft.content || "");
     if (draft.gif_url) setSelectedGif({ url: draft.gif_url, preview: draft.gif_url });
     setShowDrafts(false);
-    api.delete(`/drafts/${draft._id}`).then(() => fetchDrafts()).catch(() => {});
+    api.delete(`/drafts/${draft._id}`).then(() => fetchDrafts()).catch(() => { });
   };
 
   const deleteDraft = (draftId) => {
-    api.delete(`/drafts/${draftId}`).then(() => fetchDrafts()).catch(() => {});
+    api.delete(`/drafts/${draftId}`).then(() => fetchDrafts()).catch(() => { });
   };
 
   const handleFollowToggle = async (postAuthorId, isFollowing) => {
@@ -1102,8 +1104,8 @@ export default function FeedScreen({ navigation }) {
         animationType="slide"
         onRequestClose={() => setQuotePostId(null)}
       >
-        <View style={[styles.quoteOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}> 
-          <View style={[styles.quoteSheet, { backgroundColor: t.cardBg }]}>  
+        <View style={[styles.quoteOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}>
+          <View style={[styles.quoteSheet, { backgroundColor: t.cardBg }]}>
             <View style={styles.quoteHeader}>
               <Text style={[styles.quoteTitle, { color: t.text }]}>Quote Repost</Text>
               <TouchableOpacity onPress={() => setQuotePostId(null)}>
@@ -1128,7 +1130,7 @@ export default function FeedScreen({ navigation }) {
               const qPost = posts.find(p => p._id === quotePostId);
               if (!qPost) return null;
               return (
-                <View style={[styles.quotePreview, { borderColor: t.border }]}>  
+                <View style={[styles.quotePreview, { borderColor: t.border }]}>
                   <Text style={[styles.quotePreviewUser, { color: t.accent }]}>@{qPost.username}</Text>
                   <Text style={[styles.quotePreviewText, { color: t.textSecondary }]} numberOfLines={3}>{parseContent(qPost.content, { navigation, accentColor: t.accentBlue })}</Text>
                 </View>

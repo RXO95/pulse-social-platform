@@ -14,13 +14,13 @@ import { Text } from "react-native";
 export function parseContent(text, { navigation, accentColor = "#1d9bf0", baseStyle = {} } = {}) {
   if (!text) return null;
 
-  // Match @username (alphanumeric + underscores, 1-30 chars)
-  const mentionRegex = /(@[A-Za-z0-9_]{1,30})/g;
-  const parts = text.split(mentionRegex);
+  // Global regex for splitting, non-global for testing individual parts
+  const mentionSplitRegex = /(@[A-Za-z0-9_]{1,30})/g;
+  const mentionTestRegex = /^@[A-Za-z0-9_]{1,30}$/;
+  const parts = text.split(mentionSplitRegex);
 
   return parts.map((part, i) => {
-    if (mentionRegex.test(part)) {
-      mentionRegex.lastIndex = 0;
+    if (mentionTestRegex.test(part)) {
       const username = part.slice(1);
       return (
         <Text
@@ -34,7 +34,6 @@ export function parseContent(text, { navigation, accentColor = "#1d9bf0", baseSt
         </Text>
       );
     }
-    mentionRegex.lastIndex = 0;
     return <Text key={i}>{part}</Text>;
   });
 }

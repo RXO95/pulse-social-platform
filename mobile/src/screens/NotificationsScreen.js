@@ -17,10 +17,10 @@ import api from "../api/client";
 import { timeAgo } from "../utils/helpers";
 
 const TYPE_CFG = {
-  like:         { icon: "heart",             color: "#f91880" },
-  comment:      { icon: "chatbubble",        color: "#1d9bf0" },
-  follow:       { icon: "person-add",        color: "#7856ff" },
-  repost:       { icon: "repeat",            color: "#00ba7c" },
+  like: { icon: "heart", color: "#f91880" },
+  comment: { icon: "chatbubble", color: "#1d9bf0" },
+  follow: { icon: "person-add", color: "#7856ff" },
+  repost: { icon: "repeat", color: "#00ba7c" },
   quote_repost: { icon: "chatbubble-ellipses", color: "#ff7a00" },
 };
 
@@ -48,6 +48,16 @@ export default function NotificationsScreen({ navigation }) {
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
+
+  // Mark all as read when screen opens
+  useEffect(() => {
+    const markRead = async () => {
+      try {
+        await api.post("/notifications/read");
+      } catch { }
+    };
+    markRead();
+  }, []);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -81,9 +91,14 @@ export default function NotificationsScreen({ navigation }) {
 
   const renderNotification = ({ item: n }) => {
     const cfg = TYPE_CFG[n.type] || TYPE_CFG.like;
+    const isUnread = n.is_read === false;
     return (
       <TouchableOpacity
-        style={[styles.row, { borderBottomColor: t.border }]}
+        style={[
+          styles.row,
+          { borderBottomColor: t.border },
+          isUnread && { backgroundColor: (t.accentBlue || "#1d9bf0") + "10", borderLeftWidth: 3, borderLeftColor: t.accentBlue || "#1d9bf0" },
+        ]}
         activeOpacity={0.6}
         onPress={() => onTap(n)}
       >
@@ -92,7 +107,7 @@ export default function NotificationsScreen({ navigation }) {
           {n.actor_pic ? (
             <Image source={{ uri: n.actor_pic }} style={styles.avatar} />
           ) : (
-              <View style={[styles.avatar, { backgroundColor: t.avatarBg || "#ffd700", justifyContent: "center", alignItems: "center" }]}>
+            <View style={[styles.avatar, { backgroundColor: t.avatarBg || "#ffd700", justifyContent: "center", alignItems: "center" }]}>
               <Text style={{ color: "#fff", fontWeight: "700", fontSize: 16 }}>
                 {(n.actor_username || "?")[0].toUpperCase()}
               </Text>

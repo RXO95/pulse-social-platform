@@ -13,10 +13,10 @@ import FormatQuoteIcon from "@mui/icons-material/FormatQuote";
 import { timeAgo } from "../utils/timeAgo";
 
 const ICON_MAP = {
-  like:         { Icon: FavoriteIcon,    color: "#f91880" },
-  comment:      { Icon: ChatBubbleIcon,  color: "#1d9bf0" },
-  follow:       { Icon: PersonAddIcon,   color: "#7856ff" },
-  repost:       { Icon: RepeatIcon,      color: "#00ba7c" },
+  like: { Icon: FavoriteIcon, color: "#f91880" },
+  comment: { Icon: ChatBubbleIcon, color: "#1d9bf0" },
+  follow: { Icon: PersonAddIcon, color: "#7856ff" },
+  repost: { Icon: RepeatIcon, color: "#00ba7c" },
   quote_repost: { Icon: FormatQuoteIcon, color: "#ff7a00" },
 };
 
@@ -52,7 +52,7 @@ export default function Notifications() {
         // Small delay so unread indicators are visible briefly
         setTimeout(() => setLastReadAt(now), 3000);
       }
-    } catch {} finally {
+    } catch { } finally {
       setLoading(false);
     }
   }, [token]);
@@ -200,61 +200,64 @@ export default function Notifications() {
           {items.map((n, i) => {
             const unread = isUnread(n);
             return (
-            <div
-              key={i}
-              role="button"
-              tabIndex={0}
-              onClick={() => onTap(n)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTap(n); } }}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 12,
-                padding: mobile ? "14px 16px" : "14px 20px",
-                borderBottom: `1px solid ${t.border}`,
-                cursor: "pointer",
-                transition: "background 0.15s",
-                backgroundColor: unread
-                  ? (glass ? "rgba(29,155,240,0.06)" : (darkMode ? "rgba(29,155,240,0.08)" : "rgba(29,155,240,0.04)"))
-                  : "transparent",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = glass
-                  ? "rgba(255,255,255,0.06)"
-                  : (darkMode ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)");
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-              }}
-            >
-              {/* Avatar with type badge */}
-              <div style={{ position: "relative", flexShrink: 0 }}>
-                {avatar(n)}
-                <div style={{
-                  position: "absolute", bottom: -2, right: -2,
-                  width: 20, height: 20, borderRadius: 10,
-                  backgroundColor: glass ? "rgba(30,30,30,0.9)" : t.cardBg,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  border: `2px solid ${glass ? "rgba(255,255,255,0.15)" : t.bg}`,
-                }}>
-                  {typeIcon(n.type)}
+              <div
+                key={i}
+                role="button"
+                tabIndex={0}
+                onClick={() => onTap(n)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onTap(n); } }}
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 12,
+                  padding: mobile ? "14px 16px" : "14px 20px",
+                  borderBottom: `1px solid ${t.border}`,
+                  cursor: "pointer",
+                  transition: "background 0.15s",
+                  backgroundColor: unread
+                    ? (glass ? "rgba(29,155,240,0.06)" : (darkMode ? "rgba(29,155,240,0.08)" : "rgba(29,155,240,0.04)"))
+                    : "transparent",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = glass
+                    ? "rgba(255,255,255,0.06)"
+                    : (darkMode ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.02)");
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = unread
+                    ? (glass ? "rgba(29,155,240,0.06)" : (darkMode ? "rgba(29,155,240,0.08)" : "rgba(29,155,240,0.04)"))
+                    : "transparent";
+                }}
+              >
+                {/* Avatar with type badge */}
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  {avatar(n)}
+                  <div style={{
+                    position: "absolute", bottom: -2, right: -2,
+                    width: 20, height: 20, borderRadius: 10,
+                    backgroundColor: glass ? "rgba(30,30,30,0.9)" : t.cardBg,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    border: `2px solid ${glass ? "rgba(255,255,255,0.15)" : t.bg}`,
+                  }}>
+                    {typeIcon(n.type)}
+                  </div>
                 </div>
-              </div>
 
-              {/* Text */}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, lineHeight: 1.45, color: unread ? t.text : t.textSecondary, fontWeight: unread ? 600 : 400 }}>
-                  {message(n)}
+                {/* Text */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, lineHeight: 1.45, color: unread ? t.text : t.textSecondary, fontWeight: unread ? 600 : 400 }}>
+                    {message(n)}
+                  </div>
+                  <div style={{ fontSize: 12, color: t.textSecondary, marginTop: 4, opacity: 0.7 }}>
+                    {timeAgo(n.created_at)}
+                  </div>
                 </div>
-                <div style={{ fontSize: 12, color: t.textSecondary, marginTop: 4, opacity: 0.7 }}>
-                  {timeAgo(n.created_at)}
-                </div>
+                {unread && (
+                  <div style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.accentBlue || "#1d9bf0", flexShrink: 0, marginTop: 6 }} />
+                )}
               </div>
-              {unread && (
-                <div style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.accentBlue || "#1d9bf0", flexShrink: 0, marginTop: 6 }} />
-              )}
-            </div>
-          ); })}
+            );
+          })}
         </div>
       )}
     </div>

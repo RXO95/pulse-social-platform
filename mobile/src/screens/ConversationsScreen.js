@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -33,6 +33,7 @@ export default function ConversationsScreen({ navigation }) {
 
   const { darkMode, accentColor } = useTheme();
   const t = getTheme(darkMode, accentColor);
+  const styles = useMemo(() => s(t), [darkMode, accentColor]);
 
   // ─── Init: register public key & fetch data ───
   useEffect(() => {
@@ -141,7 +142,7 @@ export default function ConversationsScreen({ navigation }) {
     try {
       const res = await api.get(`/search/users?q=${encodeURIComponent(q)}`);
       setSearchResults(res.data);
-    } catch {}
+    } catch { }
   };
 
   const openChat = (conv) => {
@@ -168,29 +169,29 @@ export default function ConversationsScreen({ navigation }) {
 
   // ─── Render conversation item ───
   const renderConversation = ({ item }) => (
-    <TouchableOpacity style={s(t).convItem} onPress={() => openChat(item)} activeOpacity={0.7}>
-      <View style={s(t).avatar}>
+    <TouchableOpacity style={styles.convItem} onPress={() => openChat(item)} activeOpacity={0.7}>
+      <View style={styles.avatar}>
         {item.other_user?.profile_pic_url ? (
-          <Image source={{ uri: item.other_user.profile_pic_url }} style={s(t).avatarImg} />
+          <Image source={{ uri: item.other_user.profile_pic_url }} style={styles.avatarImg} />
         ) : (
-          <Text style={s(t).avatarText}>
+          <Text style={styles.avatarText}>
             {item.other_user?.username?.[0]?.toUpperCase() || "?"}
           </Text>
         )}
       </View>
-      <View style={s(t).convInfo}>
-        <View style={s(t).convTop}>
-          <Text style={s(t).convUsername} numberOfLines={1}>
+      <View style={styles.convInfo}>
+        <View style={styles.convTop}>
+          <Text style={styles.convUsername} numberOfLines={1}>
             @{item.other_user?.username}
           </Text>
-          <Text style={s(t).convTime}>{timeAgo(item.last_message_at)}</Text>
+          <Text style={styles.convTime}>{timeAgo(item.last_message_at)}</Text>
         </View>
-        <View style={s(t).convBottom}>
+        <View style={styles.convBottom}>
           <Ionicons name="lock-closed" size={12} color={t.textSecondary} style={{ marginRight: 4 }} />
-          <Text style={s(t).convPreview} numberOfLines={1}>Encrypted message</Text>
+          <Text style={styles.convPreview} numberOfLines={1}>Encrypted message</Text>
           {item.unread_count > 0 && (
-            <View style={s(t).unreadBadge}>
-              <Text style={s(t).unreadText}>{item.unread_count}</Text>
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadText}>{item.unread_count}</Text>
             </View>
           )}
         </View>
@@ -200,40 +201,40 @@ export default function ConversationsScreen({ navigation }) {
 
   // ─── Render search result ───
   const renderSearchResult = ({ item }) => (
-    <TouchableOpacity style={s(t).convItem} onPress={() => startChatWith(item)} activeOpacity={0.7}>
-      <View style={s(t).avatar}>
+    <TouchableOpacity style={styles.convItem} onPress={() => startChatWith(item)} activeOpacity={0.7}>
+      <View style={styles.avatar}>
         {item.profile_pic_url ? (
-          <Image source={{ uri: item.profile_pic_url }} style={s(t).avatarImg} />
+          <Image source={{ uri: item.profile_pic_url }} style={styles.avatarImg} />
         ) : (
-          <Text style={s(t).avatarText}>
+          <Text style={styles.avatarText}>
             {item.username?.[0]?.toUpperCase() || "?"}
           </Text>
         )}
       </View>
-      <Text style={s(t).convUsername}>@{item.username}</Text>
+      <Text style={styles.convUsername}>@{item.username}</Text>
     </TouchableOpacity>
   );
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[s(t).container, { justifyContent: "center", alignItems: "center" }]}>
+      <SafeAreaView style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
         <ActivityIndicator size="large" color={t.accentBlue} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={s(t).container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       {/* Header */}
-      <View style={s(t).header}>
-        <Text style={s(t).headerTitle}>Messages</Text>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Messages</Text>
       </View>
 
       {/* Search bar */}
-      <View style={s(t).searchBar}>
+      <View style={styles.searchBar}>
         <Ionicons name="search-outline" size={18} color={t.textSecondary} style={{ marginRight: 8 }} />
         <TextInput
-          style={s(t).searchInput}
+          style={styles.searchInput}
           placeholder="Search users to message..."
           placeholderTextColor={t.textSecondary}
           value={searchQuery}
@@ -252,10 +253,10 @@ export default function ConversationsScreen({ navigation }) {
           renderItem={renderSearchResult}
         />
       ) : conversations.length === 0 ? (
-        <View style={s(t).empty}>
+        <View style={styles.empty}>
           <Ionicons name="chatbubbles-outline" size={48} color={t.textSecondary} />
-          <Text style={[s(t).emptyText, { marginTop: 12 }]}>No messages yet</Text>
-          <Text style={s(t).emptySubtext}>Search for a user to start a conversation</Text>
+          <Text style={[styles.emptyText, { marginTop: 12 }]}>No messages yet</Text>
+          <Text style={styles.emptySubtext}>Search for a user to start a conversation</Text>
         </View>
       ) : (
         <FlatList

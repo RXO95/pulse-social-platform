@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -35,7 +35,7 @@ async function playSound(file) {
     sound.setOnPlaybackStatusUpdate((status) => {
       if (status.didJustFinish) sound.unloadAsync();
     });
-  } catch {}
+  } catch { }
 }
 
 export default function ChatScreen({ route, navigation }) {
@@ -57,16 +57,17 @@ export default function ChatScreen({ route, navigation }) {
   const reconnectRef = useRef(null);
 
   const emojiSections = [
-    { label: "Smileys", emojis: ["😀","😂","🤣","😊","😍","🥰","😘","😎","🤩","🥳","😜","🤗","🤔","😏","😢","😭","😤","🤯","🥺","😴"] },
-    { label: "Gestures", emojis: ["👍","👎","👏","🙌","🤝","✌️","🤞","💪","🫶","🫡","👋","🤙","🙏","🫂","👀","🤌"] },
-    { label: "Hearts", emojis: ["❤️","🧡","💛","💚","💙","💜","🖤","🤍","💔","❤️‍🔥","💕","💗","💖","💘","💝"] },
-    { label: "Animals", emojis: ["🐶","🐱","🐼","🦊","🦁","🐸","🐵","🦄","🐝","🦋","🐢","🐬","🐧","🦜","🐻"] },
-    { label: "Food", emojis: ["🍕","🍔","🌮","🍣","🍩","🍪","🎂","☕","🍺","🥂","🍷","🍑","🍓","🥑","🔥"] },
-    { label: "Activities", emojis: ["⚽","🏀","🎮","🎵","🎬","📸","✈️","🚀","🌍","⭐","🎉","🎊","🏆","💡","💯"] },
+    { label: "Smileys", emojis: ["😀", "😂", "🤣", "😊", "😍", "🥰", "😘", "😎", "🤩", "🥳", "😜", "🤗", "🤔", "😏", "😢", "😭", "😤", "🤯", "🥺", "😴"] },
+    { label: "Gestures", emojis: ["👍", "👎", "👏", "🙌", "🤝", "✌️", "🤞", "💪", "🫶", "🫡", "👋", "🤙", "🙏", "🫂", "👀", "🤌"] },
+    { label: "Hearts", emojis: ["❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💔", "❤️‍🔥", "💕", "💗", "💖", "💘", "💝"] },
+    { label: "Animals", emojis: ["🐶", "🐱", "🐼", "🦊", "🦁", "🐸", "🐵", "🦄", "🐝", "🦋", "🐢", "🐬", "🐧", "🦜", "🐻"] },
+    { label: "Food", emojis: ["🍕", "🍔", "🌮", "🍣", "🍩", "🍪", "🎂", "☕", "🍺", "🥂", "🍷", "🍑", "🍓", "🥑", "🔥"] },
+    { label: "Activities", emojis: ["⚽", "🏀", "🎮", "🎵", "🎬", "📸", "✈️", "🚀", "🌍", "⭐", "🎉", "🎊", "🏆", "💡", "💯"] },
   ];
 
   const { darkMode, accentColor } = useTheme();
   const t = getTheme(darkMode, accentColor);
+  const styles = useMemo(() => st(t), [darkMode, accentColor]);
 
   // ─── Init ───
   useEffect(() => {
@@ -121,7 +122,7 @@ export default function ChatScreen({ route, navigation }) {
               return [...prev, data.message];
             });
           }
-        } catch {}
+        } catch { }
       };
 
       ws.onclose = () => {
@@ -205,6 +206,7 @@ export default function ChatScreen({ route, navigation }) {
       playSound(sendSoundFile);
     } catch (err) {
       console.error("Send failed:", err);
+      toast("Failed to send message", "error");
     } finally {
       setIsSending(false);
     }
@@ -264,47 +266,47 @@ export default function ChatScreen({ route, navigation }) {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={[st(t).container, { justifyContent: "center", alignItems: "center" }]}>
+      <SafeAreaView style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
         <ActivityIndicator size="large" color={t.accentBlue} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={st(t).container} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
       {/* Header */}
-      <View style={st(t).header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={st(t).backBtn}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={24} color={t.text} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={st(t).headerInfo}
+          style={styles.headerInfo}
           onPress={() => navigation.navigate("Profile", { username: otherUser.username })}
           activeOpacity={0.7}
         >
-          <View style={st(t).headerAvatar}>
+          <View style={styles.headerAvatar}>
             {otherUser.profile_pic_url ? (
-              <Image source={{ uri: otherUser.profile_pic_url }} style={st(t).headerAvatarImg} />
+              <Image source={{ uri: otherUser.profile_pic_url }} style={styles.headerAvatarImg} />
             ) : (
-              <Text style={st(t).headerAvatarText}>
+              <Text style={styles.headerAvatarText}>
                 {otherUser.username?.[0]?.toUpperCase() || "?"}
               </Text>
             )}
           </View>
           <View>
-            <Text style={st(t).headerUsername}>@{otherUser.username}</Text>
+            <Text style={styles.headerUsername}>@{otherUser.username}</Text>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <Ionicons name="lock-closed" size={11} color="#00ba7c" style={{ marginRight: 3 }} />
-              <Text style={st(t).e2eLabel}>End-to-end encrypted</Text>
+              <Text style={styles.e2eLabel}>End-to-end encrypted</Text>
             </View>
           </View>
         </TouchableOpacity>
       </View>
 
       {/* E2E banner */}
-      <View style={st(t).e2eBanner}>
+      <View style={styles.e2eBanner}>
         <Ionicons name="lock-closed" size={14} color={t.textSecondary} style={{ marginRight: 6 }} />
-        <Text style={st(t).e2eBannerText}>
+        <Text style={styles.e2eBannerText}>
           Messages are end-to-end encrypted. No one outside of this chat can read them.
         </Text>
       </View>
@@ -327,16 +329,16 @@ export default function ChatScreen({ route, navigation }) {
 
         {/* Emoji picker */}
         {showEmoji && (
-          <View style={st(t).emojiPicker}>
+          <View style={styles.emojiPicker}>
             <ScrollView>
               {emojiSections.map((sec) => (
-                <View key={sec.label} style={st(t).emojiSection}>
-                  <Text style={st(t).emojiSectionLabel}>{sec.label}</Text>
-                  <View style={st(t).emojiGrid}>
+                <View key={sec.label} style={styles.emojiSection}>
+                  <Text style={styles.emojiSectionLabel}>{sec.label}</Text>
+                  <View style={styles.emojiGrid}>
                     {sec.emojis.map((em) => (
                       <TouchableOpacity
                         key={em}
-                        style={st(t).emojiBtn}
+                        style={styles.emojiBtn}
                         onPress={() => setDraft((p) => p + em)}
                       >
                         <Text style={{ fontSize: 24 }}>{em}</Text>
@@ -350,15 +352,15 @@ export default function ChatScreen({ route, navigation }) {
         )}
 
         {/* Compose bar */}
-        <View style={st(t).composeBar}>
+        <View style={styles.composeBar}>
           <TouchableOpacity
-            style={st(t).emojiToggle}
+            style={styles.emojiToggle}
             onPress={() => setShowEmoji((v) => !v)}
           >
             <Ionicons name={showEmoji ? "close-circle" : "happy-outline"} size={26} color={showEmoji ? (t.accentBlue || "#1d9bf0") : t.textSecondary} />
           </TouchableOpacity>
           <TextInput
-            style={st(t).composeInput}
+            style={styles.composeInput}
             placeholder="Type a message…"
             placeholderTextColor={t.textSecondary}
             value={draft}
@@ -368,7 +370,7 @@ export default function ChatScreen({ route, navigation }) {
             maxLength={2000}
           />
           <TouchableOpacity
-            style={[st(t).sendBtn, { opacity: draft.trim() ? 1 : 0.4 }]}
+            style={[styles.sendBtn, { opacity: draft.trim() ? 1 : 0.4 }]}
             onPress={handleSend}
             disabled={isSending || !draft.trim()}
           >
